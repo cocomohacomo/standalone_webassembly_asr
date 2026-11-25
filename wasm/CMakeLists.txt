@@ -10,15 +10,22 @@ endif()
 if(NOT DEFINED SHERPA_ONNX_ROOT OR NOT EXISTS "${SHERPA_ONNX_ROOT}/include/sherpa-onnx/c-api/c-api.h")
   message(FATAL_ERROR "Set SHERPA_ONNX_ROOT to an Emscripten-built sherpa-onnx C API prefix")
 endif()
+find_library(SHERPA_ONNX_C_API_LIB
+  NAMES sherpa-onnx-c-api sherpa_onnx_c_api
+  PATHS "${SHERPA_ONNX_ROOT}/lib" NO_DEFAULT_PATH)
+if(NOT SHERPA_ONNX_C_API_LIB)
+  message(FATAL_ERROR "Missing Emscripten static library: lib/libsherpa-onnx-c-api.a")
+endif()
+file(GLOB SHERPA_ONNX_STATIC_LIBS CONFIGURE_DEPENDS "${SHERPA_ONNX_ROOT}/lib/lib*.a")
+if(NOT SHERPA_ONNX_STATIC_LIBS)
+  message(FATAL_ERROR "No sherpa-onnx/ONNX Runtime static archives found in ${SHERPA_ONNX_ROOT}/lib")
+endif()
 
-# Build from an application-owned copy. Never patch the private upstream checkout.
+# Copy and adapt the private engine in the build directory only.
 set(_engine_build_src "${CMAKE_BINARY_DIR}/engine-src")
 file(REMOVE_RECURSE "${_engine_build_src}")
 file(COPY "${ENGINE_SOURCE_DIR}/" DESTINATION "${_engine_build_src}"
      PATTERN ".git" EXCLUDE PATTERN "build*" EXCLUDE PATTERN ".cache" EXCLUDE)
-
-# Upstream's native target is SHARED and its ELF version-script flags are not
-# applicable to Emscripten. Convert only this build copy to a static archive.
 file(READ "${_engine_build_src}/CMakeLists.txt" _engine_cmake)
 string(REPLACE
   "add_library(sherpa_embed_asr SHARED $<TARGET_OBJECTS:sherpa_embed_asr_core>)"
@@ -27,17 +34,30 @@ string(REPLACE
 string(REPLACE "if(UNIX AND NOT APPLE)" "if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)"
   _engine_cmake "${_engine_cmake}")
 if(NOT _engine_cmake MATCHES "add_library\\(sherpa_embed_asr STATIC")
-  message(FATAL_ERROR "Could not apply the expected static-library adaptation; upstream CMake has changed")
+  message(FATAL_ERROR "Could not apply expected static-library adaptation; upstream CMake changed")
 endif()
 file(WRITE "${_engine_build_src}/CMakeLists.txt" "${_engine_cmake}")
 
 set(SHERPA_EMBED_ASR_BUILD_APPS OFF CACHE BOOL "" FORCE)
 set(SHERPA_EMBED_ASR_FETCH_SHERPA OFF CACHE BOOL "" FORCE)
 set(SHERPA_EMBED_ASR_WITH_TRUNK OFF CACHE BOOL "" FORCE)
+set(SHERPA_ONNX_ROOT "${SHERPA_ONNX_ROOT}" CACHE PATH "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 add_subdirectory("${_engine_build_src}" engine)
 
-# This stage deliberately produces a static C++ archive. Browser glue, worker
-# ABI and final .wasm linking are separate app-owned targets, added after the
-# sherpa-onnx Emscripten C API prefix is validated.
+add_executable(sherpa_embed_asr_wasm src/wasm_exports.cpp)
+target_link_libraries(sherpa_embed_asr_wasm PRIVATE sherpa_embed_asr ${SHERPA_ONNX_STATIC_LIBS})
+target_include_directories(sherpa_embed_asr_wasm PRIVATE
+  "${ENGINE_SOURCE_DIR}/include" "${SHERPA_ONNX_ROOT}/include")
+target_compile_options(sherpa_embed_asr_wasm PRIVATE -O3 -fexceptions)
+target_link_options(sherpa_embed_asr_wasm PRIVATE
+  "-sALLOW_MEMORY_GROWTH=1"
+  "-sINITIAL_MEMORY=536870912"
+  "-sSTACK_SIZE=8388608"
+  "-sFILESYSTEM=1"
+  "-sENVIRONMENT=worker"
+  "-sMODULARIZE=1"
+  "-sEXPORT_NAME=createSherpaEmbedAsr"
+  "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error']"
+  "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToNewUTF8','HEAPF32']")
+set_target_properties(sherpa_embed_asr_wasm PROPERTIES SUFFIX ".js")
