@@ -2,6 +2,23 @@
 let runtime = null;
 let engineReady = false;
 
+async function fetchModel(url) {
+  const cacheName = "voice-memo-ja-model-v1";
+  const request = new Request(url, { mode: "cors" });
+  if ("caches" in self) {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    const response = await fetch(request);
+    if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + url);
+    if (response.type === "cors" || response.type === "basic") {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  }
+  return fetch(request);
+}
+
 async function installModelFiles(files, modelRoot) {
   const root = modelRoot || "/models";
   runtime.FS.mkdirTree(root);
@@ -16,7 +33,7 @@ async function installModelFiles(files, modelRoot) {
     const target = root + "/" + relative;
     const slash = target.lastIndexOf("/");
     if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
-    const response = await fetch(item.url);
+    const response = await fetchModel(item.url);
     if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + item.url);
     runtime.FS.writeFile(target, new Uint8Array(await response.arrayBuffer()));
     self.postMessage({ type: "model-file-ready", path: target });
