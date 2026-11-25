@@ -13,7 +13,24 @@ A mobile-first, installable PWA prototype for offline-first speech transcription
 - PWA manifest, install prompt, and versioned Service Worker app-shell caching
 - No audio upload or remote inference
 
-**ASR integration status:** the actual engine source is now managed as a pinned, local checkout in `vendor/sherpa-embed-asr`. The upstream repository is fetched read-only at a fixed commit; this project does not change the ASR repository. See [engine integration](engine/README.md). The browser/WASM adapter and model are not yet built, so real speech recognition is not connected yet.
+**ASR integration status:** the actual engine source is fetched read-only at a pinned commit into
+`vendor/sherpa-embed-asr` (ignored by this repository). The Actions check verifies access and
+the exact revision. The first application-owned Emscripten static-core build configuration is in
+[`wasm/`](wasm/README.md); it adapts a build-directory copy only and never changes the upstream
+repository. A runnable browser module, JS/Worker ABI and model integration are still pending.
+
+## Private engine checkout
+
+Register a fine-grained, read-only token as the repository Actions secret `GH_TOKEN`.
+It needs Contents: Read access to the private `sherpa-embed-asr` repository. The
+[`Verify private ASR engine checkout`](.github/workflows/engine-source-check.yml) workflow fetches
+and verifies the pinned SHA. See [engine integration](engine/README.md).
+
+## Emscripten core build
+
+See [WASM build prerequisites and current boundary](wasm/README.md). The first cross-build
+requires an Emscripten-built sherpa-onnx C API prefix; the engine's CAM++ trunk path is disabled
+for this initial target. This archive build alone is not yet browser inference.
 
 ## Deploy to GitHub Pages
 
@@ -33,8 +50,7 @@ The app shell is cached locally. Microphone recording requires a secure context 
 
 ## Roadmap
 
-1. Fetch the pinned engine source with [the clone script](engine/README.md).
-2. Inspect the native build graph and isolate the minimum inference dependency set.
-3. Implement an application-owned Emscripten/WASM build and browser-safe streaming ABI.
-4. Load WASM and model assets from a Web Worker and add offline model caching.
-5. Validate correctness, memory, latency, and Android Chrome behavior on real devices.
+1. Build and pin the sherpa-onnx Emscripten C API dependency.
+2. Complete the C ABI-to-WASM exports and browser-safe streaming interface.
+3. Run the engine in a Web Worker and add offline model caching.
+4. Validate recognition correctness, memory, latency, and Android Chrome behavior on real devices.
