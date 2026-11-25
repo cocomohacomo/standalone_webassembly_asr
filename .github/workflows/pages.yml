@@ -3,24 +3,49 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: pages
   cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate static app shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s index.html
+          test -s app.js
+          test -s sw.js
+          test -s manifest.webmanifest
+          test -s icon.svg
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("manifest.webmanifest").read_text(encoding="utf-8"))
+          assert manifest["start_url"] == "./"
+          assert manifest["scope"] == "./"
+          assert manifest["display"] == "standalone"
+          for icon in manifest["icons"]:
+              assert Path(icon["src"]).is_file(), icon["src"]
+          print("PWA manifest and app-shell files validated")
+          PY
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
   deploy:
     environment:
       name: github-pages
@@ -28,6 +53,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy to Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
