@@ -6,11 +6,12 @@ let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNod
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
 const MODEL_FILES=[
+ // Fetch small required metadata first so a bad model revision fails before large ONNX downloads.
+ {url:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
+ {url:"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",path:"silero_vad.onnx"},
  {url:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
  {url:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
- {url:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
- {url:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
- {url:"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",path:"silero_vad.onnx"}
+ {url:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"}
 ];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
 function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
