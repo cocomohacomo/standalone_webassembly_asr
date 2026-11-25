@@ -33,7 +33,7 @@ const char* EngineError() {
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE
-int wasm_asr_create(const char* model_dir, const char* vad_model_path) {
+int wasm_asr_create(const char* model_dir, const char* vad_model_path,\n                    const char* tokens_path, const char* encoder_path,\n                    const char* decoder_path, const char* joiner_path) {
   if (g_engine) {
     asr_engine_destroy(g_engine);
     g_engine = nullptr;
