@@ -18,8 +18,9 @@ async function startAndRecognize(page, label) {
     const status = document.querySelector("#statusText")?.textContent || "";
     return status.includes("録音・日本語認識中") || status.includes("録音・認識を終了");
   }, { timeout: 240000 });
-  await waitForTranscript(page, label);
+  await page.waitForTimeout(7000);
   await page.locator("#stopBtn").click();
+  await waitForTranscript(page, label);
 }
 
 (async () => {
