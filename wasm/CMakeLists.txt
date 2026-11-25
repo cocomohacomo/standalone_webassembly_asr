@@ -46,7 +46,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_subdirectory("${_engine_build_src}" engine)
 
 add_executable(sherpa_embed_asr_wasm src/wasm_exports.cpp)
-target_link_libraries(sherpa_embed_asr_wasm PRIVATE sherpa_embed_asr ${SHERPA_ONNX_STATIC_LIBS})
+target_link_libraries(sherpa_embed_asr_wasm PRIVATE sherpa_embed_asr "-Wl,--start-group" ${SHERPA_ONNX_STATIC_LIBS} "-Wl,--end-group")
 target_include_directories(sherpa_embed_asr_wasm PRIVATE
   "${ENGINE_SOURCE_DIR}/include" "${SHERPA_ONNX_ROOT}/include")
 target_compile_options(sherpa_embed_asr_wasm PRIVATE -O3 -fexceptions)
