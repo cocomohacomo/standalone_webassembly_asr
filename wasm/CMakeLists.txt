@@ -57,7 +57,7 @@ target_link_options(sherpa_embed_asr_wasm PRIVATE
   "-sINITIAL_MEMORY=536870912"
   "-sSTACK_SIZE=8388608"
   "-sFILESYSTEM=1"
-  "-sENVIRONMENT=worker"
+  "-sENVIRONMENT=web,worker,node"
   "-sMODULARIZE=1"
   "-sEXPORT_NAME=createSherpaEmbedAsr"
   "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error']"
