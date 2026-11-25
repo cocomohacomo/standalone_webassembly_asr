@@ -16,8 +16,13 @@ async function startAndRecognize(page, label) {
   await page.locator("#recordBtn").click();
   await page.waitForFunction(() => {
     const status = document.querySelector("#statusText")?.textContent || "";
-    return status.includes("録音・日本語認識中") || status.includes("録音・認識を終了");
+    return status.includes("録音・日本語認識中") || status.includes("録音・認識を終了") ||
+      status.includes("エラー") || status.includes("Model fetch failed") || status.includes("タイムアウト");
   }, undefined, { timeout: 240000 });
+  const startupStatus = await page.locator("#statusText").textContent();
+  if (startupStatus.includes("エラー") || startupStatus.includes("Model fetch failed") || startupStatus.includes("タイムアウト")) {
+    throw new Error(label + ": ASR startup failed: " + startupStatus);
+  }
   await page.waitForTimeout(7000);
   await page.locator("#stopBtn").click();
   await waitForTranscript(page, label);
