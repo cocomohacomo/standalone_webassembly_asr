@@ -39,7 +39,7 @@ async function ensureAsr(){
   if(!window.Worker||!window.AudioWorkletNode||!window.AudioContext)throw new Error("このブラウザはAudioWorklet/Workerに対応していません");
   asrWorker=new Worker("./web/wasm/asr-worker.js");
   asrWorker.onmessage=workerMessage;
-  asrWorker.onerror=e=>{status("Workerエラー: "+e.message);console.error(e)};
+  asrWorker.onerror=e=>{const detail=e.message||"unknown worker error";status("Workerエラー: "+detail);console.error("ASR_WORKER_ERROR",detail,e.filename||"",e.lineno||0)};
   const ready=new Promise((resolve,reject)=>{
    const timeout=setTimeout(()=>reject(new Error("WASM/モデル初期化がタイムアウトしました")),15*60*1000);
    const listener=({data})=>{
@@ -92,7 +92,7 @@ recordBtn.addEventListener("click",async()=>{
   recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
   recorder.onstop=()=>{audioBlob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.remove("hide");$("#downloadAudioBtn").disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました")};
   recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.disabled=true;stopBtn.disabled=false;status("録音・日本語認識中…",true);
- }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":err.message||"認識を開始できません");console.error(err);recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
+ }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
 });
 stopBtn.addEventListener("click",async()=>{
  if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.disabled=false}
