@@ -75,7 +75,8 @@ jobs:
         run: |
           source "$EMSDK/emsdk_env.sh"
           emcc --version
-          emcmake --version
+          command -v emcmake
+          cmake --version
 
       - name: Fetch pinned private C++ engine
         env:
