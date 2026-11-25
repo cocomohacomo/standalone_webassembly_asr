@@ -45,3 +45,56 @@ jobs:
           echo "Pinned engine checkout verified: $actual"
           echo "Upstream working tree status:"
           git -C vendor/sherpa-embed-asr status --short
+
+  wasm-build:
+    name: Build sherpa-onnx + sherpa-embed-asr for WebAssembly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+
+      - name: Install Emscripten SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.23
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.23
+          echo "EMSDK=$RUNNER_TEMP/emsdk" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/emsdk" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
+      - name: Activate Emscripten environment
+        shell: bash
+        run: |
+          source "$EMSDK/emsdk_env.sh"
+          emcc --version
+          emcmake --version
+
+      - name: Fetch pinned private C++ engine
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/clone-engine.sh
+          ./scripts/clone-engine.sh
+
+      - name: Build sherpa-onnx C API, ONNX Runtime and final WASM module
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$EMSDK/emsdk_env.sh"
+          chmod +x scripts/build-sherpa-onnx-wasm.sh scripts/build-wasm.sh
+          ./scripts/build-wasm.sh
+
+      - name: Upload WASM build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-embed-asr-wasm
+          path: |
+            build-wasm/sherpa_embed_asr_wasm.js
+            build-wasm/sherpa_embed_asr_wasm.wasm
+          if-no-files-found: error
+          retention-days: 7
