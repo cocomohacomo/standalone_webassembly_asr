@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "scripts/clone-engine.sh"
+      - "scripts/build-wasm.sh"
+      - "wasm/**"
       - ".github/workflows/engine-source-check.yml"
       - "engine/**"
   workflow_dispatch:
