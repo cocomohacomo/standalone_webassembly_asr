@@ -56,7 +56,10 @@ int wasm_asr_create(const char* model_dir, const char* vad_model_path,
   config.enable_diarization = 0;
   config.polish_level = ASR_POLISH_OFF;
 
-  g_engine = asr_engine_create(&config);
+  // Emscripten build is deliberately single-threaded: avoid the engine's
+  // optional decode pool, correction and normalization background workers.
+  g_engine = asr_engine_create_ex(
+      &config, "parallel_workers=1;correction_suggest=0;seibunka=0");
   if (!g_engine || !asr_engine_is_ready(g_engine)) {
     const char* error = EngineError();
     g_last_error = error ? error : "ASR engine initialization failed";
