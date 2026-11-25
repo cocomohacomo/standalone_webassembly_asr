@@ -31,6 +31,8 @@ jobs:
           test -s icon.svg
           node --check app.js
           node --check sw.js
+          node --check web/wasm/asr-worker.js
+          node --check web/wasm/pcm-worklet.js
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -75,6 +77,7 @@ jobs:
           cp build-wasm/sherpa_embed_asr_wasm.js build-wasm/sherpa_embed_asr_wasm.wasm web/wasm/dist/
           test -s web/wasm/dist/sherpa_embed_asr_wasm.js
           test -s web/wasm/dist/sherpa_embed_asr_wasm.wasm
+          node --check web/wasm/dist/sherpa_embed_asr_wasm.js
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
