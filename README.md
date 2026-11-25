@@ -13,7 +13,7 @@ A mobile-first, installable PWA prototype for offline-first speech transcription
 - PWA manifest, install prompt, and versioned Service Worker app-shell caching
 - No audio upload or remote inference
 
-**ASR integration status:** the actual `sherpa-embed-asr` WebAssembly runtime and model are not connected yet. The current app records audio locally and provides a text editor for transcription. The native engine repository currently has a C/C++ and CPU ONNX Runtime build path; a browser-targeted Emscripten/ONNX Runtime Web build and stable browser ABI still need to be added and tested before genuine on-device recognition can be connected. This repository does not ship a fake recognition fallback.
+**ASR integration status:** the actual engine source is now managed as a pinned, local checkout in `vendor/sherpa-embed-asr`. The upstream repository is fetched read-only at a fixed commit; this project does not change the ASR repository. See [engine integration](engine/README.md). The browser/WASM adapter and model are not yet built, so real speech recognition is not connected yet.
 
 ## Deploy to GitHub Pages
 
@@ -31,14 +31,10 @@ A mobile-first, installable PWA prototype for offline-first speech transcription
 
 The app shell is cached locally. Microphone recording requires a secure context and user permission. Browser storage may still be cleared by the OS. Offline startup does not mean the ASR engine is available yet.
 
-## Engine integration status
-
-The separate `sherpa-embed-asr` repository is the intended sole ASR engine. Its current tree does not contain an Emscripten, WebAssembly, or browser build target. The next engine work is to establish a supported WASM build of the required C API and ONNX Runtime Web backend, define a bounded-memory streaming interface, and validate it in Android Chrome before adding model assets to this PWA.
-
 ## Roadmap
 
-1. Add and test an Emscripten/WebAssembly target in the engine repository.
-2. Expose a browser-safe streaming C ABI and compile the model/runtime for Web.
-3. Load WASM and model assets from a Web Worker; keep inference on-device.
-4. Convert microphone audio to the engine's required PCM format and stream frames to the worker.
-5. Add offline model download, integrity/version checks, and real-device performance tests.
+1. Fetch the pinned engine source with [the clone script](engine/README.md).
+2. Inspect the native build graph and isolate the minimum inference dependency set.
+3. Implement an application-owned Emscripten/WASM build and browser-safe streaming ABI.
+4. Load WASM and model assets from a Web Worker and add offline model caching.
+5. Validate correctness, memory, latency, and Android Chrome behavior on real devices.
