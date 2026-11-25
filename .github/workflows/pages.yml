@@ -43,6 +43,39 @@ jobs:
           print("PWA manifest, JavaScript syntax, and app-shell files validated")
           PY
 
+      - name: Install Emscripten SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.23
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.23
+          echo "EMSDK=$RUNNER_TEMP/emsdk" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/emsdk" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
+      - name: Fetch pinned private ASR engine
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$EMSDK/emsdk_env.sh"
+          chmod +x scripts/clone-engine.sh
+          ./scripts/clone-engine.sh
+
+      - name: Build browser WASM runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$EMSDK/emsdk_env.sh"
+          chmod +x scripts/build-sherpa-onnx-wasm.sh scripts/build-wasm.sh
+          ./scripts/build-wasm.sh
+          mkdir -p web/wasm/dist
+          cp build-wasm/sherpa_embed_asr_wasm.js build-wasm/sherpa_embed_asr_wasm.wasm web/wasm/dist/
+          test -s web/wasm/dist/sherpa_embed_asr_wasm.js
+          test -s web/wasm/dist/sherpa_embed_asr_wasm.wasm
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
