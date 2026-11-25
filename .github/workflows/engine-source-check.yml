@@ -9,6 +9,8 @@ on:
       - "wasm/**"
       - "src/wasm_exports.cpp"
       - "web/wasm/**"
+      - "tests/wasm-ja-e2e.cjs"
+      - "scripts/test-wasm-ja-e2e.sh"
       - ".github/workflows/engine-source-check.yml"
       - "engine/**"
   workflow_dispatch:
@@ -90,6 +92,8 @@ jobs:
           source "$EMSDK/emsdk_env.sh"
           chmod +x scripts/build-sherpa-onnx-wasm.sh scripts/build-wasm.sh
           ./scripts/build-wasm.sh
+          chmod +x scripts/test-wasm-ja-e2e.sh
+          ./scripts/test-wasm-ja-e2e.sh
 
       - name: Upload WASM build artifacts
         uses: actions/upload-artifact@v4
