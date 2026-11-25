@@ -9,14 +9,17 @@ async function fetchModel(url) {
     const cache = await caches.open(cacheName);
     const cached = await cache.match(request);
     if (cached) return cached;
-    const response = await fetch(request);
+    let response;
+    try { response = await fetch(request); }
+    catch (error) { throw new Error("Model network request failed: " + url + " (" + String(error?.message || error) + ")"); }
     if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + url);
     if (response.type === "cors" || response.type === "basic") {
       await cache.put(request, response.clone());
     }
     return response;
   }
-  return fetch(request);
+  try { return await fetch(request); }
+  catch (error) { throw new Error("Model network request failed: " + url + " (" + String(error?.message || error) + ")"); }
 }
 
 async function installModelFiles(files, modelRoot) {
@@ -46,7 +49,16 @@ self.onmessage = async ({ data }) => {
     switch (data.type) {
       case "init": {
         importScripts(data.wasmJsUrl);
+        // Fetch the binary explicitly in the worker. This makes URL/CORS/cache failures
+        // actionable and avoids opaque Emscripten streaming-fetch errors.
+        const wasmUrl = new URL("sherpa_embed_asr_wasm.wasm", data.wasmBaseUrl).toString();
+        let wasmResponse;
+        try { wasmResponse = await fetch(wasmUrl, { mode: "same-origin" }); }
+        catch (error) { throw new Error("WASM network request failed: " + wasmUrl + " (" + String(error?.message || error) + ")"); }
+        if (!wasmResponse.ok) throw new Error("WASM fetch failed (" + wasmResponse.status + "): " + wasmUrl);
+        const wasmBinary = await wasmResponse.arrayBuffer();
         runtime = await self.createSherpaEmbedAsr({
+          wasmBinary,
           locateFile: (name) => new URL(name, data.wasmBaseUrl).toString(),
           print: (message) => self.postMessage({ type: "log", message }),
           printErr: (message) => self.postMessage({ type: "log", message }),
