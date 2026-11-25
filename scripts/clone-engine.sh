@@ -21,7 +21,12 @@ fi
 mkdir -p "${ROOT}/vendor"
 git init "${DEST}"
 git -C "${DEST}" remote add origin "${ENGINE_URL}"
-git -C "${DEST}" -c http.extraheader="AUTHORIZATION: bearer ${GH_TOKEN}" fetch --depth 1 origin "${ENGINE_REV}"
+# Pass the authorization header through Git's environment-based config so the token
+# does not appear in the git process command-line arguments.
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0=http.extraheader \
+GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer ${GH_TOKEN}" \
+  git -C "${DEST}" fetch --depth 1 origin "${ENGINE_REV}"
 git -C "${DEST}" checkout --detach FETCH_HEAD
 
 ACTUAL="$(git -C "${DEST}" rev-parse HEAD)"
