@@ -8,7 +8,7 @@ async function waitForTranscript(page, label) {
   await page.waitForFunction(() => document.querySelector("#text").value.trim().length > 0,
     undefined, { timeout: 240000 });
   const transcript = await page.locator("#text").inputValue();
-  if (!transcript.trim()) throw new Error(label + ": transcript is empty");
+  if (!/[ぁ-んァ-ヶ一-龯]/u.test(transcript)) throw new Error(label + ": no Japanese text in transcript: " + transcript);
   console.log(label + "_TRANSCRIPT=" + transcript.replace(/\s+/g, " "));
 }
 
