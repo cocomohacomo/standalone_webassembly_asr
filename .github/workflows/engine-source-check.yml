@@ -7,6 +7,8 @@ on:
       - "scripts/clone-engine.sh"
       - "scripts/build-wasm.sh"
       - "wasm/**"
+      - "src/wasm_exports.cpp"
+      - "web/wasm/**"
       - ".github/workflows/engine-source-check.yml"
       - "engine/**"
   workflow_dispatch:
