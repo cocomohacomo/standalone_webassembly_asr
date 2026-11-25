@@ -10,6 +10,10 @@ on:
       - "wasm/**"
       - "src/wasm_exports.cpp"
       - "web/wasm/**"
+      - "app.js"
+      - "index.html"
+      - "sw.js"
+      - "tests/pwa-browser-e2e.cjs"
       - "tests/wasm-ja-e2e.cjs"
       - "scripts/test-wasm-ja-e2e.sh"
       - ".github/workflows/engine-source-check.yml"
@@ -94,8 +98,30 @@ jobs:
           source "$EMSDK/emsdk_env.sh"
           chmod +x scripts/build-sherpa-onnx-wasm.sh scripts/build-wasm.sh
           ./scripts/build-wasm.sh
+          mkdir -p web/wasm/dist
+          cp build-wasm/sherpa_embed_asr_wasm.js build-wasm/sherpa_embed_asr_wasm.wasm web/wasm/dist/
           chmod +x scripts/test-wasm-ja-e2e.sh
           ./scripts/test-wasm-ja-e2e.sh
+
+      - name: Install Chromium for browser E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run microphone and offline relaunch browser E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 > "$RUNNER_TEMP/pwa-http.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/pwa-browser-e2e.cjs
 
       - name: Upload WASM build artifacts
         uses: actions/upload-artifact@v4
