@@ -49,7 +49,7 @@ async function ensureAsr(){
   });
   asrWorker.postMessage({
    type:"init",
-   wasmJsUrl:"./web/wasm/dist/sherpa_embed_asr_wasm.js",
+   wasmJsUrl:new URL("./web/wasm/dist/sherpa_embed_asr_wasm.js",location.href).toString(),
    wasmBaseUrl:new URL("./web/wasm/dist/",location.href).toString(),
    modelRoot:"/models",modelSubdir:"ja",modelFiles:MODEL_FILES,
    vadModelPath:"/models/silero_vad.onnx",
