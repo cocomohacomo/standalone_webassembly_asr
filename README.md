@@ -38,3 +38,8 @@ The initial visit requires network access to download the app shell. Once cached
 ## Engine
 
 ASR engine source: https://github.com/cocomohacomo/sherpa-embed-asr
+
+
+## Deployment
+
+GitHub Pages deployment is managed by `.github/workflows/pages.yml`. Configure repository Settings → Pages → Source as **GitHub Actions** before deployment.
