@@ -38,7 +38,16 @@ async function installModelFiles(files, modelRoot) {
     if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
     const response = await fetchModel(item.url);
     if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + item.url);
-    runtime.FS.writeFile(target, new Uint8Array(await response.arrayBuffer()));
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (item.sha256) {
+      if (!self.crypto?.subtle) throw new Error("SHA-256 verification is unavailable for " + item.url);
+      const digest = await self.crypto.subtle.digest("SHA-256", bytes);
+      const actual = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+      if (actual !== item.sha256.toLowerCase()) {
+        throw new Error("Model SHA-256 mismatch: " + item.url + " (expected " + item.sha256 + ", got " + actual + ")");
+      }
+    }
+    runtime.FS.writeFile(target, bytes);
     self.postMessage({ type: "model-file-ready", path: target });
   }
   return root;
