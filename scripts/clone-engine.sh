@@ -21,12 +21,16 @@ fi
 mkdir -p "${ROOT}/vendor"
 git init "${DEST}"
 git -C "${DEST}" remote add origin "${ENGINE_URL}"
-# Pass the authorization header through Git's environment-based config so the token
-# does not appear in the git process command-line arguments.
+
+# Use Git's environment-based config and the standard x-access-token Basic scheme.
+# The token is never written to git config or passed as a process argument.
+AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')"
 GIT_CONFIG_COUNT=1 \
-GIT_CONFIG_KEY_0=http.extraheader \
-GIT_CONFIG_VALUE_0="AUTHORIZATION: bearer ${GH_TOKEN}" \
+GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+GIT_CONFIG_VALUE_0="${AUTH_HEADER}" \
   git -C "${DEST}" fetch --depth 1 origin "${ENGINE_REV}"
+unset AUTH_HEADER
+
 git -C "${DEST}" checkout --detach FETCH_HEAD
 
 ACTUAL="$(git -C "${DEST}" rev-parse HEAD)"
