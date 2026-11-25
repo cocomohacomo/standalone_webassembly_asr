@@ -29,6 +29,8 @@ jobs:
           test -s sw.js
           test -s manifest.webmanifest
           test -s icon.svg
+          node --check app.js
+          node --check sw.js
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -38,7 +40,7 @@ jobs:
           assert manifest["display"] == "standalone"
           for icon in manifest["icons"]:
               assert Path(icon["src"]).is_file(), icon["src"]
-          print("PWA manifest and app-shell files validated")
+          print("PWA manifest, JavaScript syntax, and app-shell files validated")
           PY
 
       - name: Upload static site
