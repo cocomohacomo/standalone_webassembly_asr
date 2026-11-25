@@ -60,7 +60,8 @@ async function ensureAsr(){
  try{await asrStarting}finally{asrStarting=null}
 }
 async function startLivePcm(stream){
- audioContext=new AudioContext({latencyHint:"interactive"});
+ if(!audioContext)audioContext=new AudioContext({latencyHint:"interactive"});
+ if(audioContext.state==="suspended")await audioContext.resume();
  await audioContext.audioWorklet.addModule("./web/wasm/pcm-worklet.js");
  sourceNode=audioContext.createMediaStreamSource(stream);
  workletNode=new AudioWorkletNode(audioContext,"pcm-16k-processor",{numberOfInputs:1,numberOfOutputs:1,channelCount:1});
@@ -81,8 +82,10 @@ recordBtn.addEventListener("click",async()=>{
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
  recordBtn.disabled=true;status("ASRと日本語モデルを準備しています…",true);
  try{
-  await ensureAsr();
   mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  audioContext=new AudioContext({latencyHint:"interactive"});
+  await audioContext.resume();
+  await ensureAsr();
   await startLivePcm(mediaStream);
   chunks=[];audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
   recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
