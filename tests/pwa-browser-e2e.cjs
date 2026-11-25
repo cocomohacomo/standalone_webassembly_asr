@@ -6,7 +6,7 @@ const wav = path.resolve(__dirname, "../.cache/ja-model/sherpa-onnx-zipformer-ja
 
 async function waitForTranscript(page, label) {
   await page.waitForFunction(() => document.querySelector("#text").value.trim().length > 0,
-    { timeout: 240000 });
+    undefined, { timeout: 240000 });
   const transcript = await page.locator("#text").inputValue();
   if (!transcript.trim()) throw new Error(label + ": transcript is empty");
   console.log(label + "_TRANSCRIPT=" + transcript.replace(/\s+/g, " "));
@@ -17,7 +17,7 @@ async function startAndRecognize(page, label) {
   await page.waitForFunction(() => {
     const status = document.querySelector("#statusText")?.textContent || "";
     return status.includes("録音・日本語認識中") || status.includes("録音・認識を終了");
-  }, { timeout: 240000 });
+  }, undefined, { timeout: 240000 });
   await page.waitForTimeout(7000);
   await page.locator("#stopBtn").click();
   await waitForTranscript(page, label);
