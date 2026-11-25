@@ -107,8 +107,12 @@ async function main() {
 
   const finals = events.filter((e) => e.type === 2 && e.text && e.text.trim());
   if (finals.length === 0) throw new Error("No Japanese ASR_EVENT_FINAL was emitted");
+  const transcript = finals.map((e) => e.text).join("").trim();
+  if (!/[ぁ-んァ-ヶ一-龯]/u.test(transcript)) {
+    throw new Error("Final transcript contains no Japanese characters: " + transcript);
+  }
   console.log("WASM_JA_E2E_SUCCESS final_events=" + finals.length);
-  console.log("TRANSCRIPT=" + finals.map((e) => e.text).join(""));
+  console.log("TRANSCRIPT=" + transcript);
 }
 
 main().catch((error) => {
