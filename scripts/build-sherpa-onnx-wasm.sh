@@ -40,7 +40,7 @@ emcmake cmake -S "${SHERPA_REPO}" -B "${BUILD_DIR}" \
   -DSHERPA_ONNX_ENABLE_WASM_ASR=OFF \
   -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_LINK_LIBSTDCPP_STATICALLY=OFF
-cmake --build "${BUILD_DIR}" --target sherpa-onnx-c-api --parallel "${BUILD_JOBS:-2}"
+cmake --build "${BUILD_DIR}" --target sherpa-onnx-c-api sherpa-onnx-cxx-api --parallel "${BUILD_JOBS:-2}"
 cmake --install "${BUILD_DIR}"
 
 test -f "${PREFIX}/include/sherpa-onnx/c-api/c-api.h"
