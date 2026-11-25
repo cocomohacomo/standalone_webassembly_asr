@@ -1,10 +1,9 @@
 // Dedicated Worker owns the WASM runtime, model filesystem and ASR engine.
-// The UI transfers mono 16 kHz Float32 PCM chunks; no PCM copy crosses the heap.
 let runtime = null;
 let engineReady = false;
 
 async function installModelFiles(files, modelRoot) {
-  const root = modelRoot || "/models/ja";
+  const root = modelRoot || "/models";
   runtime.FS.mkdirTree(root);
   for (const item of (files || [])) {
     if (!item || typeof item.url !== "string" || typeof item.path !== "string") {
@@ -36,18 +35,25 @@ self.onmessage = async ({ data }) => {
           printErr: (message) => self.postMessage({ type: "log", message }),
           onAsrEvent: (event) => self.postMessage({ type: "asr-event", event })
         });
-        const modelDir = await installModelFiles(data.modelFiles, data.modelRoot);
-        const vadPath = data.vadModelPath
-          ? (data.vadModelPath.startsWith("/") ? data.vadModelPath : modelDir + "/" + data.vadModelPath)
-          : "";
-        const modelPtr = runtime.stringToNewUTF8(modelDir);
-        const vadPtr = runtime.stringToNewUTF8(vadPath);
-        const rc = runtime._wasm_asr_create(modelPtr, vadPtr);
-        runtime._free(modelPtr);
-        runtime._free(vadPtr);
+        const modelRoot = await installModelFiles(data.modelFiles, data.modelRoot);
+        const modelDir = modelRoot + "/" + (data.modelSubdir || "ja");
+        runtime.FS.mkdirTree(modelDir);
+        const paths = data.modelPaths || {};
+        const resolve = (path) => path.startsWith("/") ? path : modelDir + "/" + path;
+        const args = [
+          modelDir,
+          resolve(data.vadModelPath || "silero_vad.int8.onnx"),
+          resolve(paths.tokens || "tokens.txt"),
+          resolve(paths.encoder || "encoder-epoch-99-avg-1.int8.onnx"),
+          resolve(paths.decoder || "decoder-epoch-99-avg-1.onnx"),
+          resolve(paths.joiner || "joiner-epoch-99-avg-1.onnx")
+        ];
+        const ptrs = args.map((value) => runtime.stringToNewUTF8(value));
+        const rc = runtime._wasm_asr_create(...ptrs);
+        ptrs.forEach((ptr) => runtime._free(ptr));
         if (rc !== 0) throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));
         engineReady = true;
-        self.postMessage({ type: "ready", modelRoot: modelDir });
+        self.postMessage({ type: "ready", modelDir });
         break;
       }
       case "audio": {
