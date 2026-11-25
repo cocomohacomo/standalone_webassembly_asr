@@ -1,7 +1,29 @@
-// Dedicated Worker owns the WASM runtime and ASR engine. Audio is transferred
-// as Float32Array chunks; the UI thread never touches the WASM heap.
+// Dedicated Worker owns the WASM runtime, model filesystem and ASR engine.
+// The UI transfers mono 16 kHz Float32 PCM chunks; no PCM copy crosses the heap.
 let runtime = null;
 let engineReady = false;
+
+async function installModelFiles(files, modelRoot) {
+  const root = modelRoot || "/models/ja";
+  runtime.FS.mkdirTree(root);
+  for (const item of (files || [])) {
+    if (!item || typeof item.url !== "string" || typeof item.path !== "string") {
+      throw new Error("Invalid model file descriptor");
+    }
+    const relative = item.path.replace(/^\/+/, "");
+    if (relative.split("/").some((part) => part === "..")) {
+      throw new Error("Model path traversal rejected");
+    }
+    const target = root + "/" + relative;
+    const slash = target.lastIndexOf("/");
+    if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
+    const response = await fetch(item.url);
+    if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + item.url);
+    runtime.FS.writeFile(target, new Uint8Array(await response.arrayBuffer()));
+    self.postMessage({ type: "model-file-ready", path: target });
+  }
+  return root;
+}
 
 self.onmessage = async ({ data }) => {
   try {
@@ -11,10 +33,13 @@ self.onmessage = async ({ data }) => {
         runtime = await self.createSherpaEmbedAsr({
           locateFile: (name) => new URL(name, data.wasmBaseUrl).toString(),
           print: (message) => self.postMessage({ type: "log", message }),
-          printErr: (message) => self.postMessage({ type: "error", message })
+          printErr: (message) => self.postMessage({ type: "log", message }),
+          onAsrEvent: (event) => self.postMessage({ type: "asr-event", event })
         });
-        const modelDir = data.modelDir;
-        const vadPath = data.vadModelPath;
+        const modelDir = await installModelFiles(data.modelFiles, data.modelRoot);
+        const vadPath = data.vadModelPath
+          ? (data.vadModelPath.startsWith("/") ? data.vadModelPath : modelDir + "/" + data.vadModelPath)
+          : "";
         const modelPtr = runtime.stringToNewUTF8(modelDir);
         const vadPtr = runtime.stringToNewUTF8(vadPath);
         const rc = runtime._wasm_asr_create(modelPtr, vadPtr);
@@ -22,7 +47,7 @@ self.onmessage = async ({ data }) => {
         runtime._free(vadPtr);
         if (rc !== 0) throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));
         engineReady = true;
-        self.postMessage({ type: "ready" });
+        self.postMessage({ type: "ready", modelRoot: modelDir });
         break;
       }
       case "audio": {
