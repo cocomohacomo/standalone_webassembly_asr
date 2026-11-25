@@ -33,6 +33,8 @@ string(REPLACE
   _engine_cmake "${_engine_cmake}")
 string(REPLACE "if(UNIX AND NOT APPLE)" "if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)"
   _engine_cmake "${_engine_cmake}")
+string(REPLACE "if(NOT WIN32)" "if(NOT WIN32 AND NOT EMSCRIPTEN)"
+  _engine_cmake "${_engine_cmake}")
 if(NOT _engine_cmake MATCHES "add_library\\(sherpa_embed_asr STATIC")
   message(FATAL_ERROR "Could not apply expected static-library adaptation; upstream CMake changed")
 endif()
@@ -45,7 +47,7 @@ set(SHERPA_ONNX_ROOT "${SHERPA_ONNX_ROOT}" CACHE PATH "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_subdirectory("${_engine_build_src}" engine)
 
-add_executable(sherpa_embed_asr_wasm src/wasm_exports.cpp)
+add_executable(sherpa_embed_asr_wasm "${CMAKE_CURRENT_LIST_DIR}/../src/wasm_exports.cpp")
 target_link_libraries(sherpa_embed_asr_wasm PRIVATE sherpa_embed_asr "-Wl,--start-group" ${SHERPA_ONNX_STATIC_LIBS} "-Wl,--end-group")
 target_include_directories(sherpa_embed_asr_wasm PRIVATE
   "${ENGINE_SOURCE_DIR}/include" "${SHERPA_ONNX_ROOT}/include")
@@ -59,5 +61,5 @@ target_link_options(sherpa_embed_asr_wasm PRIVATE
   "-sMODULARIZE=1"
   "-sEXPORT_NAME=createSherpaEmbedAsr"
   "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error']"
-  "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToNewUTF8','HEAPF32']")
+  "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToNewUTF8','HEAPF32','FS']")
 set_target_properties(sherpa_embed_asr_wasm PROPERTIES SUFFIX ".js")
