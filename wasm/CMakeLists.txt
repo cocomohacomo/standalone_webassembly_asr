@@ -10,11 +10,12 @@ endif()
 if(NOT DEFINED SHERPA_ONNX_ROOT OR NOT EXISTS "${SHERPA_ONNX_ROOT}/include/sherpa-onnx/c-api/c-api.h")
   message(FATAL_ERROR "Set SHERPA_ONNX_ROOT to an Emscripten-built sherpa-onnx C API prefix")
 endif()
-find_library(SHERPA_ONNX_C_API_LIB
-  NAMES sherpa-onnx-c-api sherpa_onnx_c_api
-  PATHS "${SHERPA_ONNX_ROOT}/lib" NO_DEFAULT_PATH)
-if(NOT SHERPA_ONNX_C_API_LIB)
-  message(FATAL_ERROR "Missing Emscripten static library: lib/libsherpa-onnx-c-api.a")
+# Emscripten's CMake toolchain may restrict find_library() suffixes to
+# target-specific shared-library suffixes. These archives are produced by
+# sherpa-onnx's install step, so validate and link the exact archive path.
+set(SHERPA_ONNX_C_API_LIB "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.a")
+if(NOT EXISTS "${SHERPA_ONNX_C_API_LIB}")
+  message(FATAL_ERROR "Missing Emscripten static library: ${SHERPA_ONNX_C_API_LIB}")
 endif()
 file(GLOB SHERPA_ONNX_STATIC_LIBS CONFIGURE_DEPENDS "${SHERPA_ONNX_ROOT}/lib/lib*.a")
 if(NOT SHERPA_ONNX_STATIC_LIBS)
