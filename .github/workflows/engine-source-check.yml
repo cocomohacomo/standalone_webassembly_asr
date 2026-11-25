@@ -16,6 +16,7 @@ on:
       - "tests/pwa-browser-e2e.cjs"
       - "tests/wasm-ja-e2e.cjs"
       - "scripts/test-wasm-ja-e2e.sh"
+      - ".github/workflows/pages.yml"
       - ".github/workflows/engine-source-check.yml"
       - "engine/**"
   workflow_dispatch:
