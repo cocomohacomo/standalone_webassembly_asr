@@ -1,8 +1,10 @@
-const CACHE_NAME = "voice-memo-shell-v2";
+const CACHE_NAME = "voice-memo-shell-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./app.js",
+  "./web/wasm/asr-worker.js",
+  "./web/wasm/pcm-worklet.js",
   "./manifest.webmanifest",
   "./icon.svg"
 ];

@@ -1,22 +1,102 @@
 const $=s=>document.querySelector(s);
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
-let recorder=null, chunks=[], audioBlob=null, audioUrl=null, startedAt=0, timerId=null, deferredInstallPrompt=null;
+let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
+let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
+const MODEL_REV="13b4596";
+const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
+const MODEL_FILES=[
+ // Fetch small required metadata first so a bad model revision fails before large ONNX downloads.
+ {url:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
+ {url:"https://huggingface.co/daxpatel235/silero-vad/resolve/main/silero_vad.onnx",path:"silero_vad.onnx",sha256:"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"},
+ {url:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
+ {url:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
+ {url:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"}
+];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
 function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
 function setTimer(){timerEl.textContent=fmt(Date.now()-startedAt)}
 function cleanUrl(){if(audioUrl){URL.revokeObjectURL(audioUrl);audioUrl=null}}
+function workerMessage({data}){
+ if(data.type==="log")return;
+ if(data.type==="model-file-ready"){status("日本語モデルを準備中… "+data.path.split("/").pop());return}
+ if(data.type==="ready"){asrReady=true;status("日本語音声認識の準備完了");return}
+ if(data.type==="asr-event"){
+  const event=data.event||{};
+  if(event.text&&event.text.trim()){
+   if(event.type===2){textArea.value+=(textArea.value?"\n":"")+event.text.trim()}
+   else if(event.type===1){status("認識中… "+event.text.trim(),true)}
+  }
+  return;
+ }
+ if(data.type==="error"){status("ASRエラー: "+data.message);console.error(data.message);return}
+ if(data.type==="accepted"||data.type==="flushed"||data.type==="closed")return;
+}
+async function ensureAsr(){
+ if(asrReady)return;
+ if(asrStarting)return asrStarting;
+ asrStarting=(async()=>{
+  if(!window.Worker||!window.AudioWorkletNode||!window.AudioContext)throw new Error("このブラウザはAudioWorklet/Workerに対応していません");
+  asrWorker=new Worker("./web/wasm/asr-worker.js");
+  asrWorker.onmessage=workerMessage;
+  asrWorker.onerror=e=>{const detail=e.message||"unknown worker error";status("Workerエラー: "+detail);console.error("ASR_WORKER_ERROR",detail,e.filename||"",e.lineno||0)};
+  const ready=new Promise((resolve,reject)=>{
+   const timeout=setTimeout(()=>reject(new Error("WASM/モデル初期化がタイムアウトしました")),15*60*1000);
+   const listener=({data})=>{
+    if(data.type==="ready"){clearTimeout(timeout);asrWorker.removeEventListener("message",listener);resolve()}
+    if(data.type==="error"){clearTimeout(timeout);asrWorker.removeEventListener("message",listener);reject(new Error(data.message))}
+   };
+   asrWorker.addEventListener("message",listener);
+  });
+  asrWorker.postMessage({
+   type:"init",
+   wasmJsUrl:new URL("./web/wasm/dist/sherpa_embed_asr_wasm.js",location.href).toString(),
+   wasmBaseUrl:new URL("./web/wasm/dist/",location.href).toString(),
+   modelRoot:"/models",modelSubdir:"ja",modelFiles:MODEL_FILES,
+   vadModelPath:"/models/silero_vad.onnx",
+   modelPaths:{tokens:"tokens.txt",encoder:"encoder-epoch-99-avg-1.int8.onnx",decoder:"decoder-epoch-99-avg-1.onnx",joiner:"joiner-epoch-99-avg-1.onnx"}
+  });
+  await ready;
+ })();
+ try{await asrStarting}finally{asrStarting=null}
+}
+async function startLivePcm(stream){
+ if(!audioContext)audioContext=new AudioContext({latencyHint:"interactive"});
+ if(audioContext.state==="suspended")await audioContext.resume();
+ await audioContext.audioWorklet.addModule("./web/wasm/pcm-worklet.js");
+ sourceNode=audioContext.createMediaStreamSource(stream);
+ workletNode=new AudioWorkletNode(audioContext,"pcm-16k-processor",{numberOfInputs:1,numberOfOutputs:1,channelCount:1});
+ workletNode.port.onmessage=({data})=>{
+  if(data.type==="pcm"&&asrReady)asrWorker.postMessage({type:"audio",samples:data.samples},[data.samples.buffer]);
+ };
+ sourceNode.connect(workletNode);
+ // Keep the processing graph alive without sending microphone audio to speakers.
+ const silent=audioContext.createGain();silent.gain.value=0;
+ workletNode.connect(silent);silent.connect(audioContext.destination);
+}
+async function stopLivePcm(){
+ try{workletNode?.port.close();workletNode?.disconnect();sourceNode?.disconnect();if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch(e){console.warn(e)}
+ workletNode=null;sourceNode=null;audioContext=null;
+ if(asrReady)asrWorker.postMessage({type:"flush"});
+}
 recordBtn.addEventListener("click",async()=>{
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
+ recordBtn.disabled=true;status("ASRと日本語モデルを準備しています…",true);
  try{
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  audioContext=new AudioContext({latencyHint:"interactive"});
+  await audioContext.resume();
+  await ensureAsr();
+  await startLivePcm(mediaStream);
   chunks=[];audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
-  recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  recorder.onstop=()=>{audioBlob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.remove("hide");$("#downloadAudioBtn").disabled=false;stream.getTracks().forEach(t=>t.stop());status("録音完了。再生または保存できます。")};
-  recorder.start();startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.disabled=true;stopBtn.disabled=false;status("録音中…",true);
- }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"録音を開始できません");console.error(err)}
+  recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  recorder.onstop=()=>{audioBlob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.remove("hide");$("#downloadAudioBtn").disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました")};
+  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.disabled=true;stopBtn.disabled=false;status("録音・日本語認識中…",true);
+ }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
 });
-stopBtn.addEventListener("click",()=>{if(recorder?.state==="recording"){recorder.stop();clearInterval(timerId);recordBtn.disabled=false;stopBtn.disabled=true}});
+stopBtn.addEventListener("click",async()=>{
+ if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.disabled=false}
+});
 $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const a=document.createElement("a");a.href=audioUrl;a.download="voice-memo-"+new Date().toISOString().replace(/[:.]/g,"-")+".webm";a.click()});
 $("#copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(textArea.value);status("テキストをコピーしました")}catch{textArea.select();status("テキストを選択しました。コピーしてください")}});
 $("#exportBtn").addEventListener("click",()=>{const blob=new Blob([textArea.value],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="transcription.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
@@ -29,4 +109,4 @@ addEventListener("online",()=>$("#connection").textContent="オンライン");ad
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;installBtn.hidden=false});
 installBtn.addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;installBtn.hidden=true});
 window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;installBtn.hidden=true;status("アプリをインストールしました")});
-if("serviceWorker" in navigator && location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(error=>{console.warn("Service Worker registration failed",error);status("オフライン機能の初期化に失敗しました")})}
+if("serviceWorker" in navigator&&location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(error=>{console.warn("Service Worker registration failed",error);status("オフライン機能の初期化に失敗しました")})}

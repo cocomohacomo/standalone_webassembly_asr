@@ -1,0 +1,135 @@
+name: Verify private ASR engine checkout
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/clone-engine.sh"
+      - "scripts/build-wasm.sh"
+      - "scripts/build-sherpa-onnx-wasm.sh"
+      - "wasm/**"
+      - "src/wasm_exports.cpp"
+      - "web/wasm/**"
+      - "app.js"
+      - "index.html"
+      - "sw.js"
+      - "tests/pwa-browser-e2e.cjs"
+      - "tests/wasm-ja-e2e.cjs"
+      - "scripts/test-wasm-ja-e2e.sh"
+      - ".github/workflows/pages.yml"
+      - ".github/workflows/engine-source-check.yml"
+      - "engine/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-source-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkout-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned private C++ engine
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/clone-engine.sh
+          ./scripts/clone-engine.sh
+
+      - name: Verify pinned revision and checkout integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="36f8a71e3ed0ea43ca2d9058f62dc0c359e6e04e"
+          actual="$(git -C vendor/sherpa-embed-asr rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test "$(git -C vendor/sherpa-embed-asr rev-parse --is-inside-work-tree)" = "true"
+          echo "Pinned engine checkout verified: $actual"
+          echo "Upstream working tree status:"
+          git -C vendor/sherpa-embed-asr status --short
+
+  wasm-build:
+    name: Build sherpa-onnx + sherpa-embed-asr for WebAssembly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+
+      - name: Install Emscripten SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.23
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.23
+          echo "EMSDK=$RUNNER_TEMP/emsdk" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/emsdk" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
+      - name: Activate Emscripten environment
+        shell: bash
+        run: |
+          source "$EMSDK/emsdk_env.sh"
+          emcc --version
+          command -v emcmake
+          cmake --version
+
+      - name: Fetch pinned private C++ engine
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/clone-engine.sh
+          ./scripts/clone-engine.sh
+
+      - name: Build sherpa-onnx C API, ONNX Runtime and final WASM module
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "$EMSDK/emsdk_env.sh"
+          chmod +x scripts/build-sherpa-onnx-wasm.sh scripts/build-wasm.sh
+          ./scripts/build-wasm.sh
+          mkdir -p web/wasm/dist
+          cp build-wasm/sherpa_embed_asr_wasm.js build-wasm/sherpa_embed_asr_wasm.wasm web/wasm/dist/
+          chmod +x scripts/test-wasm-ja-e2e.sh
+          ./scripts/test-wasm-ja-e2e.sh
+
+      - name: Install Chromium for browser E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run microphone and offline relaunch browser E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 > "$RUNNER_TEMP/pwa-http.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/pwa-browser-e2e.cjs
+
+      - name: Upload WASM build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-embed-asr-wasm
+          path: |
+            build-wasm/sherpa_embed_asr_wasm.js
+            build-wasm/sherpa_embed_asr_wasm.wasm
+          if-no-files-found: error
+          retention-days: 7

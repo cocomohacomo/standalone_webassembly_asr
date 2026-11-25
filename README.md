@@ -13,7 +13,24 @@ A mobile-first, installable PWA prototype for offline-first speech transcription
 - PWA manifest, install prompt, and versioned Service Worker app-shell caching
 - No audio upload or remote inference
 
-**ASR integration status:** the actual `sherpa-embed-asr` WebAssembly runtime and model are not connected yet. The current app records audio locally and provides a text editor for transcription. The native engine repository currently has a C/C++ and CPU ONNX Runtime build path; a browser-targeted Emscripten/ONNX Runtime Web build and stable browser ABI still need to be added and tested before genuine on-device recognition can be connected. This repository does not ship a fake recognition fallback.
+**ASR integration status:** the actual engine source is fetched read-only at a pinned commit into
+`vendor/sherpa-embed-asr` (ignored by this repository). The Actions check verifies access and
+the exact revision. The first application-owned Emscripten static-core build configuration is in
+[`wasm/`](wasm/README.md); it adapts a build-directory copy only and never changes the upstream
+repository. A runnable browser module, JS/Worker ABI and model integration are still pending.
+
+## Private engine checkout
+
+Register a fine-grained, read-only token as the repository Actions secret `GH_TOKEN`.
+It needs Contents: Read access to the private `sherpa-embed-asr` repository. The
+[`Verify private ASR engine checkout`](.github/workflows/engine-source-check.yml) workflow fetches
+and verifies the pinned SHA. See [engine integration](engine/README.md).
+
+## Emscripten core build
+
+See [WASM build prerequisites and current boundary](wasm/README.md). The first cross-build
+requires an Emscripten-built sherpa-onnx C API prefix; the engine's CAM++ trunk path is disabled
+for this initial target. This archive build alone is not yet browser inference.
 
 ## Deploy to GitHub Pages
 
@@ -31,14 +48,9 @@ A mobile-first, installable PWA prototype for offline-first speech transcription
 
 The app shell is cached locally. Microphone recording requires a secure context and user permission. Browser storage may still be cleared by the OS. Offline startup does not mean the ASR engine is available yet.
 
-## Engine integration status
-
-The separate `sherpa-embed-asr` repository is the intended sole ASR engine. Its current tree does not contain an Emscripten, WebAssembly, or browser build target. The next engine work is to establish a supported WASM build of the required C API and ONNX Runtime Web backend, define a bounded-memory streaming interface, and validate it in Android Chrome before adding model assets to this PWA.
-
 ## Roadmap
 
-1. Add and test an Emscripten/WebAssembly target in the engine repository.
-2. Expose a browser-safe streaming C ABI and compile the model/runtime for Web.
-3. Load WASM and model assets from a Web Worker; keep inference on-device.
-4. Convert microphone audio to the engine's required PCM format and stream frames to the worker.
-5. Add offline model download, integrity/version checks, and real-device performance tests.
+1. Build and pin the sherpa-onnx Emscripten C API dependency.
+2. Complete the C ABI-to-WASM exports and browser-safe streaming interface.
+3. Run the engine in a Web Worker and add offline model caching.
+4. Validate recognition correctness, memory, latency, and Android Chrome behavior on real devices.
