@@ -1,7 +1,7 @@
 const $=s=>document.querySelector(s);
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
-const settingsDefaults={saveAudio:true,timestamps:false,speakerDisplay:false,dictionary:[],speakers:[]};
+const settingsDefaults={saveAudio:true,timestamps:false,speakerDisplay:false,vadSensitivity:"0.25",minSilence:"0.5",maxPaths:"8",dictionary:[],speakers:[]};
 let settings={...settingsDefaults};
 try{settings={...settingsDefaults,...JSON.parse(localStorage.getItem("vnnSettings")||"{}")}}catch{}
 function persistSettings(){localStorage.setItem("vnnSettings",JSON.stringify(settings))}
@@ -9,7 +9,7 @@ function renderSettingsListsOnce(){
  const render=(id,items,key)=>{const root=$(id);root.innerHTML="";items.forEach((value,i)=>{const row=document.createElement("div");row.className="list-item";const span=document.createElement("span");span.textContent=value;const remove=document.createElement("button");remove.textContent="削除";remove.onclick=()=>{settings[key].splice(i,1);persistSettings();renderSettingsListsOnce()};row.append(span,remove);root.append(row)})};
  render("#dictionaryList",settings.dictionary,"dictionary");render("#speakerList",settings.speakers,"speakers");
 }
-function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#timestampSetting").checked=!!settings.timestamps;$("#speakerDisplaySetting").checked=!!settings.speakerDisplay;renderSettingsListsOnce();$("#settingsPanel").classList.add("open")}
+function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#timestampSetting").checked=!!settings.timestamps;$("#speakerDisplaySetting").checked=!!settings.speakerDisplay;$("#vadSensitivity").value=settings.vadSensitivity;$("#minSilence").value=settings.minSilence;$("#maxPaths").value=settings.maxPaths;renderSettingsListsOnce();$("#settingsPanel").classList.add("open")}
 function closeSettings(){$("#settingsPanel").classList.remove("open")}
 
 let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
@@ -65,7 +65,7 @@ async function ensureAsr(){
    wasmBaseUrl:new URL("./web/wasm/dist/",location.href).toString(),
    modelRoot:"/models",modelSubdir:"ja",modelFiles:MODEL_FILES,
    vadModelPath:"/models/silero_vad.onnx",
-   modelPaths:{tokens:"tokens.txt",encoder:"encoder-epoch-99-avg-1.int8.onnx",decoder:"decoder-epoch-99-avg-1.onnx",joiner:"joiner-epoch-99-avg-1.onnx"}
+   modelPaths:{tokens:"tokens.txt",encoder:"encoder-epoch-99-avg-1.int8.onnx",decoder:"decoder-epoch-99-avg-1.onnx",joiner:"joiner-epoch-99-avg-1.onnx"},options:"vad_threshold="+settings.vadSensitivity+";vad_min_silence="+settings.minSilence+";max_active_paths="+settings.maxPaths
   });
   await ready;
  })();
@@ -93,7 +93,7 @@ async function stopLivePcm(){
 recordBtn.addEventListener("click",async()=>{
  if(recorder?.state==="recording"){stopBtn.click();return}
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
- recordBtn.disabled=true;recordBtn.textContent="準備中";status("ASRと日本語モデルを準備しています…",true);
+ recordBtn.disabled=true;recordBtn.textContent="…";if(!asrReady&&!confirm("日本語音声認識モデルが未準備です。初回は約155MBのモデルをダウンロードします。続行しますか？")){recordBtn.disabled=false;recordBtn.textContent="●";return}status("ASRと日本語モデルを準備しています…",true);
  try{
   mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   audioContext=new AudioContext({latencyHint:"interactive"});
@@ -102,19 +102,19 @@ recordBtn.addEventListener("click",async()=>{
   await startLivePcm(mediaStream);
   chunks=[];audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
   recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
-  recorder.onstop=()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.remove("hide");$("#downloadAudioBtn").disabled=false}else{audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="開始";recordBtn.disabled=false};
-  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.textContent="停止";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
+  recorder.onstop=()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex"}else{audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none"}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false};
+  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
  }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.textContent="開始";recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
 });
 stopBtn.addEventListener("click",async()=>{
- if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.textContent="開始";recordBtn.disabled=false}
+ if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.textContent="●";recordBtn.disabled=false}
 });
 $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const a=document.createElement("a");a.href=audioUrl;a.download="voice-memo-"+new Date().toISOString().replace(/[:.]/g,"-")+".webm";a.click()});
-$("#copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(textArea.value);status("テキストをコピーしました")}catch{textArea.select();status("テキストを選択しました。コピーしてください")}});
+
 $("#exportBtn").addEventListener("click",()=>{const blob=new Blob([textArea.value],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="transcription.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
 function loadHistory(){let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};historyEl.innerHTML="";if(!list.length){historyEl.innerHTML='<p class="hint">保存した履歴はここに表示されます。</p>';return}list.slice(0,30).forEach(item=>{const row=document.createElement("div");row.className="history-item";const label=document.createElement("span");label.textContent=item.date;const open=document.createElement("button");open.textContent="開く";open.onclick=()=>textArea.value=item.text;row.append(label,open);historyEl.append(row)})}
 $("#saveBtn").addEventListener("click",()=>{const value=textArea.value.trim();if(!value){status("保存するテキストがありません");return}let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};list.unshift({date:new Date().toLocaleString("ja-JP"),text:value});localStorage.setItem("voiceMemoHistory",JSON.stringify(list.slice(0,30)));loadHistory();status("履歴に保存しました")});
-$("#clearBtn").addEventListener("click",()=>{textArea.value="";audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";status("待機中")});
+$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;textArea.value="";audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";status("待機中")});
 loadHistory();
 $("#connection").textContent=navigator.onLine?"オンライン":"オフライン";
 addEventListener("online",()=>$("#connection").textContent="オンライン");addEventListener("offline",()=>$("#connection").textContent="オフライン");
@@ -126,7 +126,7 @@ if("serviceWorker" in navigator&&location.protocol!=="file:"){navigator.serviceW
 $("#settingsBtn").addEventListener("click",openSettings);$("#settingsClose").addEventListener("click",closeSettings);$("#settingsPanel").addEventListener("click",e=>{if(e.target.id==="settingsPanel")closeSettings()});
 $("#saveAudioSetting").addEventListener("change",e=>{settings.saveAudio=e.target.checked;persistSettings();if(!settings.saveAudio){audioBlob=null;cleanUrl();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true}});
 $("#timestampSetting").addEventListener("change",e=>{settings.timestamps=e.target.checked;persistSettings()});
-$("#speakerDisplaySetting").addEventListener("change",e=>{settings.speakerDisplay=e.target.checked;persistSettings()});
+$("#speakerDisplaySetting").addEventListener("change",e=>{settings.speakerDisplay=e.target.checked;persistSettings()});\n["vadSensitivity","minSilence","maxPaths"].forEach(id=>$("#"+id).addEventListener("change",e=>{settings[id]=e.target.value;persistSettings();status("認識パラメータは次回起動時に適用されます")}));\n$("#playToggle").addEventListener("click",()=>{if(!audioBlob)return;if(audioEl.paused){audioEl.play();$("#playToggle").textContent="Ⅱ"}else{audioEl.pause();$("#playToggle").textContent="▶"}});audioEl.addEventListener("timeupdate",()=>{if(audioEl.duration>0)$("#playProgress").style.height=(audioEl.currentTime/audioEl.duration*100)+"%"});audioEl.addEventListener("ended",()=>$("#playToggle").textContent="▶");
 $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
 $("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce()});
