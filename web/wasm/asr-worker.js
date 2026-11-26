@@ -54,7 +54,8 @@ async function installModelFiles(files, modelRoot) {
   runtime.FS.mkdirTree(root);
   for (const item of (files || [])) {
     if (!item || typeof item.url !== "string" || typeof item.path !== "string") throw new Error("Invalid model file descriptor");
-    const relative = item.path.replace(/^\\/+/, "");
+    let relative = item.path;
+    while (relative.startsWith("/")) relative = relative.slice(1);
     if (relative.split("/").some(part => part === "..")) throw new Error("Model path traversal rejected");
     const target = root + "/" + relative;
     const slash = target.lastIndexOf("/");
