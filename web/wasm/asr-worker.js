@@ -93,6 +93,10 @@ self.onmessage = async ({ data }) => {
           resolve(paths.joiner || "joiner-epoch-99-avg-1.onnx"),
           data.options || ""
         ];
+        const optionPtr = runtime.stringToNewUTF8(data.options || "");
+        const optionDump = runtime._wasm_asr_options_dump(optionPtr);
+        self.postMessage({ type: "options-effective", options: runtime.UTF8ToString(optionDump) });
+        runtime._free(optionPtr);
         const ptrs = args.map((value) => runtime.stringToNewUTF8(value));
         const rc = runtime._wasm_asr_create(...ptrs);
         ptrs.forEach((ptr) => runtime._free(ptr));
