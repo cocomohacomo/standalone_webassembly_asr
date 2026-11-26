@@ -32,13 +32,13 @@ let enrollmentChunks=[],enrollmentSamples=0,speakerProfiles=[];const ENROLLMENT_
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
 const MODEL_FILES=[
- // Fetch small required metadata first so a bad model revision fails before large ONNX downloads.
- {url:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
- {url:"https://huggingface.co/daxpatel235/silero-vad/resolve/main/silero_vad.onnx",path:"silero_vad.onnx",sha256:"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"},
- {url:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
- {url:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
- {url:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
- {url:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
+ // Prefer repository-local, versioned assets. Remote URLs remain temporary fallbacks until all LFS objects are committed.
+ {url:"../../models/ja/tokens.txt",fallbackUrl:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
+ {url:"../../models/silero_vad.onnx",fallbackUrl:"https://huggingface.co/daxpatel235/silero-vad/resolve/main/silero_vad.onnx",path:"silero_vad.onnx",sha256:"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"},
+ {url:"../../models/ja/encoder-epoch-99-avg-1.int8.onnx",fallbackUrl:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
+ {url:"../../models/ja/decoder-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
+ {url:"../../models/ja/joiner-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
+ {url:"../../models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",fallbackUrl:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
 ];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
 function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
