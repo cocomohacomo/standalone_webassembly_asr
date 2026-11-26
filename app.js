@@ -38,7 +38,7 @@ const MODEL_FILES=[
  {url:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
  {url:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
  {url:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
- {url:"https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx"}
+ {url:"https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
 ];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
 function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
