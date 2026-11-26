@@ -33,6 +33,8 @@ Preserve both upstream attributions and include the applicable Apache-2.0 and MI
 File currently fetched: `3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx`
 SHA-256: `f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11`
 
+The app pins the Hugging Face mirror to immutable revision `8be2a75c9ed7a590538b268e46fbb65e1aa9d208` rather than `main`. The revision's Xet pointer records the same SHA-256 and a file size of 28,281,138 bytes. The app verifies the downloaded bytes before writing the model into the WASM filesystem.
+
 Upstream model: https://www.modelscope.cn/models/iic/speech_campplus_sv_zh-cn_16k-common
 The ModelScope model card declares Apache License 2.0. The model is associated with the 3D-Speaker project:
 https://github.com/modelscope/3D-Speaker
