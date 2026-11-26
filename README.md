@@ -54,3 +54,18 @@ The app shell is cached locally. Microphone recording requires a secure context 
 2. Complete the C ABI-to-WASM exports and browser-safe streaming interface.
 3. Run the engine in a Web Worker and add offline model caching.
 4. Validate recognition correctness, memory, latency, and Android Chrome behavior on real devices.
+
+
+## License and model notices
+
+The application and ASR engine have separate license scopes. The embedded
+`sherpa-embed-asr` engine is MIT-licensed at pinned revision
+`3984a60ed89a3ce496953a08d72e232618dbec6b`. Its bundled sherpa-onnx and ONNX
+Runtime dependencies retain their own Apache-2.0 / MIT terms and notices.
+The copied upstream notices and license texts are in [licenses/](licenses/).
+Model artifacts have separate terms documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The Pages artifact publishes these notices under `/licenses/` as well as the
+model notice at `/THIRD_PARTY_NOTICES.md`. The application repository's own
+`LICENSE` does not replace any third-party license.
