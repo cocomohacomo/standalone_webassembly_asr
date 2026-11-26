@@ -86,6 +86,7 @@ jobs:
           source "$EMSDK/emsdk_env.sh"
           chmod +x scripts/build-sherpa-onnx-wasm.sh scripts/build-wasm.sh
           ./scripts/build-wasm.sh
+          if [[ -f models/SHA256SUMS ]]; then (cd models && sha256sum -c SHA256SUMS); fi
           mkdir -p web/wasm/dist
           cp build-wasm/sherpa_embed_asr_wasm.js build-wasm/sherpa_embed_asr_wasm.wasm web/wasm/dist/
           test -s web/wasm/dist/sherpa_embed_asr_wasm.js
@@ -106,6 +107,7 @@ jobs:
           cp -a licenses/. _site/licenses/
           install -m 0644 web/wasm/asr-worker.js web/wasm/pcm-worklet.js _site/web/wasm/
           install -m 0644 web/wasm/dist/sherpa_embed_asr_wasm.js web/wasm/dist/sherpa_embed_asr_wasm.wasm _site/web/wasm/dist/
+          if [[ -f models/SHA256SUMS ]]; then install -d _site/models; cp -a models/. _site/models/; fi
           : > _site/.nojekyll
 
           python3 - <<'PY'
@@ -165,6 +167,7 @@ jobs:
           node --check _site/web/wasm/asr-worker.js
           node --check _site/web/wasm/pcm-worklet.js
           node --check _site/web/wasm/dist/sherpa_embed_asr_wasm.js
+          if [[ -f _site/models/SHA256SUMS ]]; then (cd _site/models && sha256sum -c SHA256SUMS); fi
           du -ah _site | sort -h | tail -20
 
       - name: Upload static site
