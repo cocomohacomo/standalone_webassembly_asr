@@ -90,7 +90,8 @@ self.onmessage = async ({ data }) => {
           resolve(paths.tokens || "tokens.txt"),
           resolve(paths.encoder || "encoder-epoch-99-avg-1.int8.onnx"),
           resolve(paths.decoder || "decoder-epoch-99-avg-1.onnx"),
-          resolve(paths.joiner || "joiner-epoch-99-avg-1.onnx")
+          resolve(paths.joiner || "joiner-epoch-99-avg-1.onnx"),
+          data.options || ""
         ];
         const ptrs = args.map((value) => runtime.stringToNewUTF8(value));
         const rc = runtime._wasm_asr_create(...ptrs);
