@@ -44,8 +44,8 @@ avoids assuming SharedArrayBuffer/COOP/COEP support on static GitHub Pages.
 ## Validation status
 
 The Emscripten build and Pages artifact validation passed in workflow run
-`45905171386` (engine revision at that time: `60c8e87412e6e14919a0256f5e94951d18a773cd`). The app now pins the license-audited engine revision
-`60c8e87412e6e14919a0256f5e94951d18a773cd`; its corresponding rebuild is pending.
+`45905171386` (engine revision at that time: `294fa2c06f72f01d2dc5345a5cf42a56903fb830`). The app now pins the license-audited engine revision
+`294fa2c06f72f01d2dc5345a5cf42a56903fb830`; its corresponding rebuild is pending.
 A Japanese model/audio fixture E2E test, browser microphone-to-transcript test,
 and offline first-load test remain required before claiming recognition works
 end-to-end. Do not substitute mock output for real model inference.
