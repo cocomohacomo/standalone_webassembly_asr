@@ -60,7 +60,7 @@ The app shell is cached locally. Microphone recording requires a secure context 
 
 The application and ASR engine have separate license scopes. The embedded
 `sherpa-embed-asr` engine is MIT-licensed at pinned revision
-`bf5dcf89ced71456c69aaeaf8722b3e44ac1a5a6`. Its bundled sherpa-onnx and ONNX
+`60c8e87412e6e14919a0256f5e94951d18a773cd`. Its bundled sherpa-onnx and ONNX
 Runtime dependencies retain their own Apache-2.0 / MIT terms and notices.
 The copied upstream notices and license texts are in [licenses/](licenses/).
 Model artifacts have separate terms documented in
