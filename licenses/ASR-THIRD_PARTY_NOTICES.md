@@ -17,7 +17,7 @@ Default `lib` / `python` / `bench` packages use the permissive asset profile: bu
 | OpenSSL 3 libcrypto | **not shipped** (Linux system library; Windows uses CNG / DPAPI) | Apache-2.0 | — |
 | Windows Media Foundation (M4A / AAC / WMA input) | **not shipped** (part of Windows) | — | — |
 | CPython (bench flavor) | `runtime/` | PSF License | `CPython_LICENSE.txt` (copied by the pack script) |
-| dr_wav / dr_flac / dr_mp3 (dr_libs), stb_vorbis (vendored in `third_party/audio_decoders`) | compiled into the library | public domain (Unlicense) or MIT-0 / public domain or MIT | `audio-decoders.NOTICE.txt`; source revisions and hashes: `third_party/audio_decoders/README.md` |
+| dr_wav / dr_flac / dr_mp3 (dr_libs), stb_vorbis (vendored in `third_party/audio_decoders`) | compiled into the library | MIT No Attribution (MIT-0) / MIT | `audio-decoders.NOTICE.txt`; source revisions and hashes: `third_party/audio_decoders/README.md` |
 | benchmark UI adapted from `cocomohacomo/whisper-diarization-suite` | `benchmark/` (bench flavor) | MIT | `whisper-diarization-suite.NOTICE.txt` |
 | numpy, sounddevice (+ PortAudio) (bench flavor) | `runtime/` site-packages | BSD-3 / MIT (MIT) | each package's `*.dist-info/` (shipped with it) |
 
