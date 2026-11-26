@@ -131,4 +131,26 @@ $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInpu
 $("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
 $("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#speakerInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#speakerAdd").click()});
-$("#shareBtn").addEventListener("click",async()=>{const files=[];if(audioBlob&&settings.saveAudio&&window.File)files.push(new File([audioBlob],"transcription-audio.webm",{type:audioBlob.type||"audio/webm"}));const transcript=textArea.value.trim();if(!transcript&&!files.length){status("共有する内容がありません");return}try{if(navigator.share){const payload={title:"文字起こしアプリ vn.n",text:transcript||undefined,files:files.length?files:undefined};if(!files.length||!navigator.canShare||navigator.canShare({files}))await navigator.share(payload);else if(transcript)await navigator.share({title:"文字起こしアプリ vn.n",text:transcript);else status("この端末では音声ファイルを共有できません")}else if(transcript){await navigator.clipboard.writeText(transcript);status("共有機能が未対応のためテキストをコピーしました")}else status("共有機能がこのブラウザでは利用できません")}catch(e){if(e.name!=="AbortError")status("共有できませんでした")}});
+$("#shareBtn").addEventListener("click",async()=>{
+ const files=[];
+ if(audioBlob&&settings.saveAudio&&window.File)files.push(new File([audioBlob],"transcription-audio.webm",{type:audioBlob.type||"audio/webm"}));
+ const transcript=textArea.value.trim();
+ if(!transcript&&!files.length){status("共有する内容がありません");return}
+ try{
+  if(navigator.share){
+   const payload={title:"文字起こしアプリ vn.n",text:transcript||undefined,files:files.length?files:undefined};
+   if(!files.length||!navigator.canShare||navigator.canShare({files})){
+    await navigator.share(payload);
+   }else if(transcript){
+    await navigator.share({title:"文字起こしアプリ vn.n",text:transcript});
+   }else{
+    status("この端末では音声ファイルを共有できません");
+   }
+  }else if(transcript){
+   await navigator.clipboard.writeText(transcript);
+   status("共有機能が未対応のためテキストをコピーしました");
+  }else{
+   status("共有機能がこのブラウザでは利用できません");
+  }
+ }catch(e){if(e.name!=="AbortError")status("共有できませんでした")}
+});
