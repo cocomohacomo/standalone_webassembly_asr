@@ -1,6 +1,6 @@
 # Model assets
 
-The runtime is now local-first: it requests these repository-relative assets and temporarily falls back to the pinned Hugging Face URLs until the LFS objects are committed.
+The runtime is now local-first: it requests these repository-relative assets and temporarily falls back to the upstream Hugging Face URLs until the LFS objects are committed.
 
 Expected layout:
 
