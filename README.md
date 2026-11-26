@@ -15,9 +15,9 @@ A mobile-first, installable PWA prototype for offline-first speech transcription
 
 **ASR integration status:** the actual engine source is fetched read-only at a pinned commit into
 `vendor/sherpa-embed-asr` (ignored by this repository). The Actions check verifies access and
-the exact revision. The first application-owned Emscripten static-core build configuration is in
+the exact revision. The application-owned Emscripten static-core build configuration is in
 [`wasm/`](wasm/README.md); it adapts a build-directory copy only and never changes the upstream
-repository. A runnable browser module, JS/Worker ABI and model integration are still pending.
+repository. The browser WASM module, Worker protocol, and model-loading path are now present. The Pages workflow builds the real WASM artifact and validates the published app shell; full browser microphone-to-transcript E2E and offline first-load still require separate verification.
 
 ## Private engine checkout
 
