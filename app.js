@@ -10,7 +10,7 @@ function persistTranscript(){try{localStorage.setItem(TRANSCRIPT_KEY,textArea.va
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
 const appVersion=$("#appVersion");
-fetch("./VERSION").then(r=>r.ok?r.text():Promise.reject()).then(v=>{appVersion.textContent=v.trim()}).catch(()=>{appVersion.textContent="0.1.0"});
+fetch("./VERSION").then(r=>r.ok?r.text():Promise.reject()).then(v=>{appVersion.textContent=v.trim();document.title="文字起こしアプリ vn."+v.trim()}).catch(()=>{appVersion.textContent="0.1.0";document.title="文字起こしアプリ vn.0.1.0"});
 const settingsDefaults={saveAudio:true,timestamps:false,speakerDisplay:false,vadSensitivity:"0.25",minSilence:"0.5",maxPaths:"8",dictionary:[],speakers:[]};
 let settings={...settingsDefaults};
 try{settings={...settingsDefaults,...JSON.parse(localStorage.getItem("vnnSettings")||"{}")}}catch{}
@@ -183,7 +183,7 @@ $("#shareBtn").addEventListener("click",async()=>{
  if(!transcript&&!files.length){status("共有する内容がありません");return}
  try{
   if(navigator.share){
-   const payload={title:"文字起こしアプリ vn.n",text:transcript||undefined,files:files.length?files:undefined};
+   const payload={title:"文字起こしアプリ vn."+appVersion.textContent,text:transcript||undefined,files:files.length?files:undefined};
    if(!files.length||!navigator.canShare||navigator.canShare({files})){
     await navigator.share(payload);
    }else if(transcript){
