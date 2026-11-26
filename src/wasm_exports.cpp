@@ -41,7 +41,7 @@ EMSCRIPTEN_KEEPALIVE
 const char* wasm_asr_options_dump(const char* options) {
   AsrConfig config;
   asr_config_init_defaults(&config);
-  std::string effective = "parallel_workers=1;correction_suggest=0;seibunka=0";
+  std::string effective = "parallel_workers=1;correction_suggest=0;seibunka=0;continuous_time=0";
   if (options && *options) { effective += ";"; effective += options; }
   std::vector<char> buffer(65536, '\0');
   const int rc = asr_options_dump(&config, effective.c_str(), buffer.data(),
