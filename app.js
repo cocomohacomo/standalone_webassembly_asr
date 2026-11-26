@@ -38,7 +38,7 @@ const MODEL_FILES=[
  {url:"../../models/ja/encoder-epoch-99-avg-1.int8.onnx",fallbackUrl:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
  {url:"../../models/ja/decoder-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
  {url:"../../models/ja/joiner-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
- {url:"../../models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",fallbackUrl:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
+ {url:"../../models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",fallbackUrl:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/8be2a75c9ed7a590538b268e46fbb65e1aa9d208/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
 ];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
 function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
