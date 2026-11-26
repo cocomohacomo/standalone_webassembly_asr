@@ -1,6 +1,17 @@
 const $=s=>document.querySelector(s);
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
+const settingsDefaults={saveAudio:true,timestamps:false,speakerDisplay:false,dictionary:[],speakers:[]};
+let settings={...settingsDefaults};
+try{settings={...settingsDefaults,...JSON.parse(localStorage.getItem("vnnSettings")||"{}")}}catch{}
+function persistSettings(){localStorage.setItem("vnnSettings",JSON.stringify(settings))}
+function renderSettingsListsOnce(){
+ const render=(id,items,key)=>{const root=$(id);root.innerHTML="";items.forEach((value,i)=>{const row=document.createElement("div");row.className="list-item";const span=document.createElement("span");span.textContent=value;const remove=document.createElement("button");remove.textContent="削除";remove.onclick=()=>{settings[key].splice(i,1);persistSettings();renderSettingsListsOnce()};row.append(span,remove);root.append(row)})};
+ render("#dictionaryList",settings.dictionary,"dictionary");render("#speakerList",settings.speakers,"speakers");
+}
+function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#timestampSetting").checked=!!settings.timestamps;$("#speakerDisplaySetting").checked=!!settings.speakerDisplay;renderSettingsListsOnce();$("#settingsPanel").classList.add("open")}
+function closeSettings(){$("#settingsPanel").classList.remove("open")}
+
 let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
 let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
 const MODEL_REV="13b4596";
@@ -24,7 +35,7 @@ function workerMessage({data}){
  if(data.type==="asr-event"){
   const event=data.event||{};
   if(event.text&&event.text.trim()){
-   if(event.type===2){textArea.value+=(textArea.value?"\n":"")+event.text.trim()}
+   if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";textArea.value+=(textArea.value?"\n":"")+stamp+event.text.trim()}
    else if(event.type===1){status("認識中… "+event.text.trim(),true)}
   }
   return;
@@ -81,7 +92,7 @@ async function stopLivePcm(){
 }
 recordBtn.addEventListener("click",async()=>{
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
- recordBtn.disabled=true;status("ASRと日本語モデルを準備しています…",true);
+ recordBtn.disabled=true;recordBtn.textContent="準備中";status("ASRと日本語モデルを準備しています…",true);
  try{
   mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   audioContext=new AudioContext({latencyHint:"interactive"});
@@ -89,13 +100,13 @@ recordBtn.addEventListener("click",async()=>{
   await ensureAsr();
   await startLivePcm(mediaStream);
   chunks=[];audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
-  recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  recorder.onstop=()=>{audioBlob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.remove("hide");$("#downloadAudioBtn").disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました")};
-  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.disabled=true;stopBtn.disabled=false;status("録音・日本語認識中…",true);
- }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
+  recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
+  recorder.onstop=()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.classList.remove("hide");$("#downloadAudioBtn").disabled=false}else{audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="開始";recordBtn.disabled=false};
+  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.textContent="停止";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
+ }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.textContent="開始";recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
 });
 stopBtn.addEventListener("click",async()=>{
- if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.disabled=false}
+ if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.textContent="開始";recordBtn.disabled=false}
 });
 $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const a=document.createElement("a");a.href=audioUrl;a.download="voice-memo-"+new Date().toISOString().replace(/[:.]/g,"-")+".webm";a.click()});
 $("#copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(textArea.value);status("テキストをコピーしました")}catch{textArea.select();status("テキストを選択しました。コピーしてください")}});
@@ -110,3 +121,14 @@ window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();def
 installBtn.addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;installBtn.hidden=true});
 window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;installBtn.hidden=true;status("アプリをインストールしました")});
 if("serviceWorker" in navigator&&location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(error=>{console.warn("Service Worker registration failed",error);status("オフライン機能の初期化に失敗しました")})}
+
+$("#copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(textArea.value)}catch{textArea.select()}});
+$("#settingsBtn").addEventListener("click",openSettings);$("#settingsClose").addEventListener("click",closeSettings);$("#settingsPanel").addEventListener("click",e=>{if(e.target.id==="settingsPanel")closeSettings()});
+$("#saveAudioSetting").addEventListener("change",e=>{settings.saveAudio=e.target.checked;persistSettings();if(!settings.saveAudio){audioBlob=null;cleanUrl();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true}});
+$("#timestampSetting").addEventListener("change",e=>{settings.timestamps=e.target.checked;persistSettings()});
+$("#speakerDisplaySetting").addEventListener("change",e=>{settings.speakerDisplay=e.target.checked;persistSettings()});
+$("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
+$("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
+$("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce()});
+$("#speakerInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#speakerAdd").click()});
+$("#shareBtn").addEventListener("click",async()=>{const files=[];if(audioBlob&&settings.saveAudio&&window.File)files.push(new File([audioBlob],"transcription-audio.webm",{type:audioBlob.type||"audio/webm"}));const transcript=textArea.value.trim();if(!transcript&&!files.length){status("共有する内容がありません");return}try{if(navigator.share){const payload={title:"文字起こしアプリ vn.n",text:transcript||undefined,files:files.length?files:undefined};if(!files.length||!navigator.canShare||navigator.canShare({files}))await navigator.share(payload);else if(transcript)await navigator.share({title:"文字起こしアプリ vn.n",text:transcript);else status("この端末では音声ファイルを共有できません")}else if(transcript){await navigator.clipboard.writeText(transcript);status("共有機能が未対応のためテキストをコピーしました")}else status("共有機能がこのブラウザでは利用できません")}catch(e){if(e.name!=="AbortError")status("共有できませんでした")}});
