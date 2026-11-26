@@ -37,7 +37,7 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 int wasm_asr_create(const char* model_dir, const char* vad_model_path,
                     const char* tokens_path, const char* encoder_path,
-                    const char* decoder_path, const char* joiner_path) {
+                    const char* decoder_path, const char* joiner_path, const char* options) {
   if (g_engine) {
     asr_engine_destroy(g_engine);
     g_engine = nullptr;
@@ -58,8 +58,9 @@ int wasm_asr_create(const char* model_dir, const char* vad_model_path,
 
   // Emscripten build is deliberately single-threaded: avoid the engine's
   // optional decode pool, correction and normalization background workers.
-  g_engine = asr_engine_create_ex(
-      &config, "parallel_workers=1;correction_suggest=0;seibunka=0");
+  std::string effective = "parallel_workers=1;correction_suggest=0;seibunka=0";
+  if (options && *options) { effective += ";"; effective += options; }
+  g_engine = asr_engine_create_ex(&config, effective.c_str());
   if (!g_engine || !asr_engine_is_ready(g_engine)) {
     const char* error = EngineError();
     g_last_error = error ? error : "ASR engine initialization failed";
