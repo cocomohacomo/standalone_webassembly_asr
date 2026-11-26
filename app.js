@@ -135,7 +135,7 @@ function syncTranscriptToPlayback(){
  const time=audioEl.currentTime;
  const segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);
  if(!segment||document.activeElement===textArea)return;
- try{textArea.setSelectionRange(segment.start,segment.end)}catch{}
+ try{textArea.focus({preventScroll:true});textArea.setSelectionRange(segment.start,segment.end)}catch{}
 }
 $("#playToggle").addEventListener("click",async()=>{
  if(!audioBlob)return;
