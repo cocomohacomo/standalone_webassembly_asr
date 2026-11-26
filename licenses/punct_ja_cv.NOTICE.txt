@@ -1,0 +1,9 @@
+configs/punct_ja_cv.tsv — punctuation n-gram count table (Phase 14)
+
+Derived from the Japanese sentences of Mozilla Common Voice 8.0 (test split
+as packaged by japanese-asr/ja_asr.common_voice_8_0), which are released
+under CC0 1.0 (public domain dedication). The 200 rows used for evaluation
+were excluded from training. The table itself is also dedicated CC0 1.0.
+
+Regenerate:
+  python scripts/train_punct_model.py --exclude <eval manifest> --out configs/punct_ja_cv.tsv
