@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${ROOT}/vendor/sherpa-embed-asr"
 ENGINE_URL="https://github.com/cocomohacomo/sherpa-embed-asr.git"
-ENGINE_REV="36f8a71e3ed0ea43ca2d9058f62dc0c359e6e04e"
+ENGINE_REV="3984a60ed89a3ce496953a08d72e232618dbec6b"
 
 if [[ -z "${GH_TOKEN:-}" ]]; then
   echo "GH_TOKEN is required (read-only access to cocomohacomo/sherpa-embed-asr)." >&2
