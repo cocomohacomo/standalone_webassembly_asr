@@ -11,31 +11,36 @@ async function persistVoiceprints(){const path=cstr("/data/voiceprints.oed");con
 
 async function fetchModel(url, checksum) {
   const request = new Request(url, { mode: "cors" });
-  // Checksum-pinned assets bypass cache reads so stale/corrupt cache entries
-  // cannot prevent startup. Other model files may use cache as an optimization.
   let cache = null;
   if ("caches" in self) {
     try {
-      cache = await caches.open("voice-memo-ja-model-v3");
+      cache = await caches.open("voice-memo-ja-model-v4");
       if (!checksum) {
         const cached = await cache.match(request);
-        if (cached) return cached;
+        if (cached && cached.ok && (await cached.clone().arrayBuffer()).byteLength > 0) return cached;
+        if (cached) await cache.delete(request);
       }
     } catch (error) {
       console.warn("Model cache unavailable; fetching without cache:", error);
       cache = null;
     }
   }
-  let response, lastError;
+  let response;
   for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
     try {
-      response = await fetch(request);
+      response = await fetch(request, { signal: controller.signal });
       if (!response.ok) throw new Error("HTTP " + response.status);
+      if ((await response.clone().arrayBuffer()).byteLength === 0) throw new Error("Empty response");
+      clearTimeout(timeoutId);
       break;
     } catch (error) {
-      lastError = error;
-      if (attempt === 2) throw new Error("Model network request failed after 3 attempts: " + url + " (" + String(error?.message || error) + ")");
-      await new Promise(resolve => setTimeout(resolve, 700 * (attempt + 1)));
+      clearTimeout(timeoutId);
+      const reason = error?.name === "AbortError" ? "120s timeout" : String(error?.message || error);
+      if (attempt === 2) throw new Error("Download failed after 3 attempts: " + url + " (" + reason + ")");
+      console.warn("Model fetch retry", attempt + 1, url, reason);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
   if (cache && (response.type === "cors" || response.type === "basic")) {
@@ -48,33 +53,30 @@ async function installModelFiles(files, modelRoot) {
   const root = modelRoot || "/models";
   runtime.FS.mkdirTree(root);
   for (const item of (files || [])) {
-    if (!item || typeof item.url !== "string" || typeof item.path !== "string") {
-      throw new Error("Invalid model file descriptor");
-    }
-    const relative = item.path.replace(/^\/+/, "");
-    if (relative.split("/").some((part) => part === "..")) {
-      throw new Error("Model path traversal rejected");
-    }
+    if (!item || typeof item.url !== "string" || typeof item.path !== "string") throw new Error("Invalid model file descriptor");
+    const relative = item.path.replace(/^\\/+/, "");
+    if (relative.split("/").some(part => part === "..")) throw new Error("Model path traversal rejected");
     const target = root + "/" + relative;
     const slash = target.lastIndexOf("/");
     if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
-    const response = await fetchModel(item.url, item.sha256);
-    if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + item.url);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (item.sha256) {
-      if (!self.crypto?.subtle) throw new Error("SHA-256 verification is unavailable for " + item.url);
-      const digest = await self.crypto.subtle.digest("SHA-256", bytes);
-      const actual = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
-      if (actual !== item.sha256.toLowerCase()) {
-        throw new Error("Model SHA-256 mismatch: " + item.url + " (expected " + item.sha256 + ", got " + actual + ")");
+    try {
+      const response = await fetchModel(item.url, item.sha256);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (!bytes.length) throw new Error("Downloaded file is empty");
+      if (item.sha256) {
+        if (!self.crypto?.subtle) throw new Error("SHA-256 verification unavailable");
+        const digest = await self.crypto.subtle.digest("SHA-256", bytes);
+        const actual = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
+        if (actual !== item.sha256.toLowerCase()) throw new Error("SHA-256 mismatch: expected " + item.sha256 + ", got " + actual);
       }
+      runtime.FS.writeFile(target, bytes);
+      self.postMessage({ type: "model-file-ready", path: target });
+    } catch (error) {
+      throw new Error("Failed model " + item.path + " [" + item.url + "]: " + String(error?.message || error));
     }
-    runtime.FS.writeFile(target, bytes);
-    self.postMessage({ type: "model-file-ready", path: target });
   }
   return root;
 }
-
 self.onmessage = async ({ data }) => {
   try {
     switch (data.type) {
