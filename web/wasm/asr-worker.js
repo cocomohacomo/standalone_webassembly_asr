@@ -7,6 +7,7 @@ async function loadVoiceprintPack(){const db=await openVoiceprintDb();const valu
 async function saveVoiceprintPack(bytes){const db=await openVoiceprintDb();await new Promise((resolve,reject)=>{const tx=db.transaction(VOICEPRINT_STORE,"readwrite");tx.objectStore(VOICEPRINT_STORE).put(bytes,"sealed");tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}
 function cstr(value){return runtime.stringToNewUTF8(String(value??""))}
 function jsonFrom(ptr){return ptr?runtime.UTF8ToString(ptr):"[]"}
+async function persistVoiceprints(){const path=cstr("/data/voiceprints.oed");const rc=runtime._wasm_asr_voiceprint_save(path);runtime._free(path);if(rc<0)throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));await saveVoiceprintPack(runtime.FS.readFile("/data/voiceprints.oed"));}
 
 async function fetchModel(url) {
   const request = new Request(url, { mode: "cors" });
@@ -147,7 +148,7 @@ self.onmessage = async ({ data }) => {
       case "speaker-rename": {
         const id=cstr(data.id),name=cstr(data.name);const rc=runtime._wasm_asr_rename_speaker(id,name);runtime._free(id);runtime._free(name);
         if(rc<0)throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));
-        self.postMessage({type:"speaker-profiles",profiles:jsonFrom(runtime._wasm_asr_voiceprint_profiles())}); break;
+        self.postMessage({type:"speaker-profiles",profiles:jsonFrom(runtime._wasm_asr_voiceprint_profiles())}); await persistVoiceprints(); break;
       }
       case "speaker-delete": {
         const id=cstr(data.id);const rc=runtime._wasm_asr_delete_voiceprint(id);runtime._free(id);
