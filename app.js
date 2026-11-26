@@ -95,9 +95,7 @@ async function startLivePcm(stream){
  await audioContext.audioWorklet.addModule("./web/wasm/pcm-worklet.js");
  sourceNode=audioContext.createMediaStreamSource(stream);
  workletNode=new AudioWorkletNode(audioContext,"pcm-16k-processor",{numberOfInputs:1,numberOfOutputs:1,channelCount:1});
- workletNode.port.onmessage=({data})=>{
-  if(data.type==="pcm"&&asrReady)asrWorker.postMessage({type:"audio",samples:data.samples},[data.samples.buffer]);
- };
+ workletNode.port.onmessage=({data})=>{if(data.type==="pcm"&&asrReady){const copy=new Float32Array(data.samples);enrollmentChunks.push(copy);enrollmentSamples+=copy.length;while(enrollmentSamples>ENROLLMENT_MAX_SAMPLES&&enrollmentChunks.length){enrollmentSamples-=enrollmentChunks[0].length;enrollmentChunks.shift()}asrWorker.postMessage({type:"audio",samples:data.samples},[data.samples.buffer]);}};
  sourceNode.connect(workletNode);
  // Keep the processing graph alive without sending microphone audio to speakers.
  const silent=audioContext.createGain();silent.gain.value=0;
@@ -118,7 +116,7 @@ recordBtn.addEventListener("click",async()=>{
   await audioContext.resume();
   await ensureAsr();
   await startLivePcm(mediaStream);
-  chunks=[];audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
+  chunks=[];enrollmentChunks=[];enrollmentSamples=0;audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
   recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
   recorder.onstop=async()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){try{await saveAudioLocally(audioBlob)}catch(error){console.warn("Audio persistence failed",error);status("録音音声を端末に保存できませんでした")}audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.currentTime=0;audioEl.load();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex"}else{await clearAudioLocally();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none"}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false};
   recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
