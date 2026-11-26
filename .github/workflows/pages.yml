@@ -29,6 +29,8 @@ jobs:
           test -s sw.js
           test -s manifest.webmanifest
           test -s icon.svg
+          test -s web/wasm/asr-worker.js
+          test -s web/wasm/pcm-worklet.js
           node --check app.js
           node --check sw.js
           node --check web/wasm/asr-worker.js
@@ -36,6 +38,7 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+
           manifest = json.loads(Path("manifest.webmanifest").read_text(encoding="utf-8"))
           assert manifest["start_url"] == "./"
           assert manifest["scope"] == "./"
@@ -79,10 +82,70 @@ jobs:
           test -s web/wasm/dist/sherpa_embed_asr_wasm.wasm
           node --check web/wasm/dist/sherpa_embed_asr_wasm.js
 
+      - name: Assemble and validate Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Publish only runtime assets. Never archive the checkout, source vendor,
+          # compiler output, or mutable dependency caches.
+          rm -rf _site
+          install -d _site/web/wasm/dist
+          install -m 0644 index.html app.js sw.js manifest.webmanifest icon.svg _site/
+          install -m 0644 web/wasm/asr-worker.js web/wasm/pcm-worklet.js _site/web/wasm/
+          install -m 0644 web/wasm/dist/sherpa_embed_asr_wasm.js web/wasm/dist/sherpa_embed_asr_wasm.wasm _site/web/wasm/dist/
+          : > _site/.nojekyll
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("_site")
+          required = [
+              "index.html",
+              "app.js",
+              "sw.js",
+              "manifest.webmanifest",
+              "icon.svg",
+              "web/wasm/asr-worker.js",
+              "web/wasm/pcm-worklet.js",
+              "web/wasm/dist/sherpa_embed_asr_wasm.js",
+              "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
+              ".nojekyll",
+          ]
+          for name in required:
+              path = root / name
+              assert path.is_file() and path.stat().st_size > 0, f"Missing/empty artifact file: {name}"
+
+          manifest = json.loads((root / "manifest.webmanifest").read_text(encoding="utf-8"))
+          for icon in manifest["icons"]:
+              assert (root / icon["src"].removeprefix("./")).is_file(), icon["src"]
+
+          app = (root / "app.js").read_text(encoding="utf-8")
+          shell = (root / "sw.js").read_text(encoding="utf-8")
+          assert '"./web/wasm/asr-worker.js"' in shell
+          assert '"./web/wasm/pcm-worklet.js"' in shell
+          assert "./web/wasm/asr-worker.js" in app
+          assert "./web/wasm/pcm-worklet.js" in app
+          assert "./web/wasm/dist/sherpa_embed_asr_wasm.js" in app
+
+          forbidden = {".cache", "vendor", "build-wasm", ".git", "node_modules"}
+          present = forbidden.intersection(path.name for path in root.iterdir())
+          assert not present, f"Build/cache directories leaked into Pages artifact: {sorted(present)}"
+          print(f"Pages artifact validated: {len(required)} required files, {sum(1 for p in root.rglob('*') if p.is_file())} files total")
+          PY
+
+          node --check _site/app.js
+          node --check _site/sw.js
+          node --check _site/web/wasm/asr-worker.js
+          node --check _site/web/wasm/pcm-worklet.js
+          node --check _site/web/wasm/dist/sherpa_embed_asr_wasm.js
+          du -ah _site | sort -h | tail -20
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: ./_site
 
   deploy:
     environment:
