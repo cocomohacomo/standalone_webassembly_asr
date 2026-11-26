@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "声メモ - Offline ASR",
-  "short_name": "声メモ",
-  "description": "端末内録音と文字起こしメモ",
+  "name": "文字起こしアプリ vn.n",
+  "short_name": "vn.n",
+  "description": "端末内音声の文字起こし",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
