@@ -1,4 +1,4 @@
-const CACHE_NAME = "voice-memo-shell-v12";
+const CACHE_NAME = "voice-memo-shell-v13";
 const APP_SHELL = [
   "./",
   "./index.html",
