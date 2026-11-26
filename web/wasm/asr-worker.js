@@ -46,7 +46,8 @@ async function fetchModel(url, checksum, fallbackUrl) {
         lastError = error;
         const reason = error?.name === "AbortError" ? "120s timeout" : String(error?.message || error);
         console.warn("Model fetch retry", attempt + 1, candidate, reason);
-        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        if (attempt < 2 && !/HTTP 404|HTTP 403/.test(reason)) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        if (/HTTP 404|HTTP 403/.test(reason)) break;
       }
     }
     console.warn("Model source unavailable; trying fallback:", candidate, lastError);
