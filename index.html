@@ -11,7 +11,7 @@
 main{max-width:760px;margin:auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(112px + env(safe-area-inset-bottom))}
 header{padding:10px 0 18px;font-size:18px;font-weight:600;letter-spacing:.01em}
 #text{display:block;width:100%;min-height:calc(100dvh - 130px);resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font:inherit;line-height:1.8;padding:8px 0 32px}
-#text::placeholder{color:#b0b0b0}
+#text::placeholder{color:#b0b0b0}.transcript-copy{border:1px solid #e5e5e5;background:#fff;color:#111;border-radius:10px;padding:9px 14px;font:inherit}
 .bottom-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 5px 22px #0001;z-index:10;width:min(calc(100% - 28px),430px)}
 .bottom-bar button{flex:1;min-height:48px;border:0;background:#f3f3f3;border-radius:12px;color:#111;font:inherit;font-weight:600;cursor:pointer}
 .bottom-bar #recordBtn{background:#111;color:#fff}
@@ -40,7 +40,7 @@ button:disabled{opacity:.4}
 <div class="controls"><button class="btn primary" id="recordBtn">開始</button><button class="btn" id="stopBtn" disabled>停止</button></div>
 <p class="hint" id="audioHint">録音音声はこの端末内で処理します。</p>
 <div id="transcriptionNotice" class="notice">日本語音声認識モデルを初期化します。</div><div id="speechNotice" class="notice hide"></div>
-<textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea>
+<textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea><button id="copyBtn" class="transcript-copy" type="button">コピー</button>
 <div class="legacy-actions"><button class="btn" id="copyBtn">コピー</button><button class="btn" id="exportBtn">TXT保存</button><button class="btn" id="saveBtn">履歴保存</button></div>
 <div class="card" id="history-card"><div id="history"></div></div>
 <audio id="audio" controls class="hide" style="width:100%"></audio><button id="downloadAudioBtn" disabled>録音を保存</button><button id="clearBtn">クリア</button><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span id="connection">準備中</span>
