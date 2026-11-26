@@ -150,6 +150,8 @@ function updatePlaybackCursor(){const ratio=audioEl.duration>0?Math.max(0,Math.m
 function syncTranscriptToPlayback(focus=false){const time=audioEl.currentTime;const segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);if(!segment){if(document.activeElement===textArea)textArea.setSelectionRange(0,0);return;}if(focus&&document.activeElement!==textArea)textArea.focus({preventScroll:true});try{textArea.setSelectionRange(segment.start,segment.end)}catch{}}
 $("#playToggle").addEventListener("click",async()=>{if(!audioBlob)return;if(audioEl.paused){try{await audioEl.play();$("#playToggle").textContent="Ⅱ";syncTranscriptToPlayback(true)}catch(error){status("音声を再生できません: "+(error.message||"再生エラー"))}}else{audioEl.pause();$("#playToggle").textContent="▶"}});
 let railDragging=false;
+$("#playToggle").addEventListener("pointerdown",event=>event.preventDefault());
+$("#playRail").addEventListener("keydown",event=>{if(!audioBlob||!Number.isFinite(audioEl.duration))return;let next=audioEl.currentTime;if(event.key==="ArrowUp"||event.key==="ArrowRight")next+=Math.max(1,audioEl.duration/100);else if(event.key==="ArrowDown"||event.key==="ArrowLeft")next-=Math.max(1,audioEl.duration/100);else if(event.key==="Home")next=0;else if(event.key==="End")next=audioEl.duration;else return;event.preventDefault();audioEl.currentTime=Math.max(0,Math.min(audioEl.duration,next));updatePlaybackCursor();syncTranscriptToPlayback(true)});
 $("#playRail").addEventListener("pointerdown",event=>{railDragging=true;event.currentTarget.setPointerCapture(event.pointerId);seekFromPointer(event)});
 $("#playRail").addEventListener("pointermove",event=>{if(railDragging)seekFromPointer(event)});
 $("#playRail").addEventListener("pointerup",()=>{railDragging=false});
