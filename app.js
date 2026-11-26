@@ -50,7 +50,7 @@ function workerMessage({data}){
  if(data.type==="asr-event"){
   const event=data.event||{};
   if(event.text&&event.text.trim()){
-   if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const prefix=textArea.value?"\n":"";const start=textArea.value.length+prefix.length+stamp.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+event.text.trim();transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+event.text.trim().length});internalTranscriptUpdate=false;persistTranscript();try{localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments))}catch{}}
+   if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const speakerId=String(event.speaker??"").trim();const match=speakerId.match(/(?:speaker|spk)?[_ -]?(\\d+)/i);const speakerIndex=match?Number(match[1]):NaN;const speakerLabel=settings.speakerDisplay&&Number.isInteger(speakerIndex)&&settings.speakers[speakerIndex]?"["+settings.speakers[speakerIndex]+"] ":"";const prefix=textArea.value?"\\n":"";const start=textArea.value.length+prefix.length+stamp.length+speakerLabel.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+speakerLabel+event.text.trim();transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+event.text.trim().length});internalTranscriptUpdate=false;persistTranscript();try{localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments))}catch{}}
    else if(event.type===1){status("認識中… "+event.text.trim(),true)}
   }
   return;
