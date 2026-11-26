@@ -61,6 +61,6 @@ target_link_options(sherpa_embed_asr_wasm PRIVATE
   "-sENVIRONMENT=web,worker,node"
   "-sMODULARIZE=1"
   "-sEXPORT_NAME=createSherpaEmbedAsr"
-  "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error']"
+  "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_options_dump','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error']"
   "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToNewUTF8','FS','HEAPF32']")
 set_target_properties(sherpa_embed_asr_wasm PROPERTIES SUFFIX ".js")
