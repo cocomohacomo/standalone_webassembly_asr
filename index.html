@@ -6,33 +6,35 @@
 <link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="./icon.svg">
 <title>文字起こしアプリ vn.n</title>
 <style>
-:root{color-scheme:light;--text:#111;--muted:#777;--line:#e5e5e5;--surface:#fff;--accent:#111}
-*{box-sizing:border-box}body{margin:0;background:var(--surface);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Noto Sans JP",sans-serif;min-height:100dvh}
-main{max-width:760px;margin:auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(112px + env(safe-area-inset-bottom))}
-header{padding:10px 0 18px;font-size:18px;font-weight:600;letter-spacing:.01em}
-#text{display:block;width:100%;min-height:calc(100dvh - 130px);resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font:inherit;line-height:1.8;padding:8px 0 32px}
-#text::placeholder{color:#b0b0b0}.transcript-copy{border:1px solid #e5e5e5;background:#fff;color:#111;border-radius:10px;padding:9px 14px;font:inherit}
-.bottom-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 5px 22px #0001;z-index:10;width:min(calc(100% - 28px),430px)}
-.bottom-bar button{flex:1;min-height:48px;border:0;background:#f3f3f3;border-radius:12px;color:#111;font:inherit;font-weight:600;cursor:pointer}
-.bottom-bar #recordBtn{background:#111;color:#fff}
+:root{color-scheme:light;--ink:#161616;--muted:#777;--line:#e7e7e7;--accent:#111}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Noto Sans JP",sans-serif}
+main{max-width:800px;margin:auto;padding:calc(12px + env(safe-area-inset-top)) 16px calc(108px + env(safe-area-inset-bottom))}
+header{font-size:17px;font-weight:600;padding:12px 0 18px}
+#statusText{font-size:12px;color:var(--muted);min-height:1.5em;margin-bottom:8px;overflow-wrap:anywhere}
+.transcript{display:flex;gap:10px;align-items:stretch}
+#playbackRail{width:42px;flex:none;display:none;flex-direction:column;align-items:center;gap:8px}
+#playToggle{border:0;background:transparent;padding:6px;color:var(--ink);font-size:18px}
+#playRail{width:4px;flex:1;min-height:100px;background:#eee;border-radius:4px;position:relative;overflow:hidden}
+#playProgress{position:absolute;inset:0 0 auto;height:0;background:#111}
+#text{width:100%;min-height:calc(100dvh - 150px);resize:vertical;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;line-height:1.8;padding:6px 0 32px}
+#text::placeholder{color:#aaa}
+#clearBtn{position:absolute;right:18px;bottom:calc(116px + env(safe-area-inset-bottom));border:0;background:transparent;color:#888;font-size:12px;padding:8px}
+.bottom-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:22px;padding:10px 18px;background:#fff;border-radius:24px;z-index:10}
+.bottom-bar button{border:0;background:transparent;color:#111;font:inherit;min-width:42px;min-height:46px;font-size:17px}
+.bottom-bar #recordBtn{background:#111;color:#fff;border-radius:50%;width:54px;height:54px;font-weight:600}
 button:disabled{opacity:.4}
-#timer,#recordDot,#stopBtn,.legacy-actions,#history-card,#installBtn,.notice,.hint,.section-title,#audioHint{display:none!important}\n#statusText{display:block;font-size:12px;color:#666;min-height:1.4em;margin:0 0 8px;overflow-wrap:anywhere}
-#settingsPanel{position:fixed;inset:0;z-index:20;background:#0005;display:none;align-items:flex-end;justify-content:center}
+#settingsPanel{position:fixed;inset:0;z-index:20;background:#0004;display:none;align-items:flex-end;justify-content:center}
 #settingsPanel.open{display:flex}
-.settings-sheet{width:min(100%,680px);max-height:85dvh;overflow:auto;background:#fff;border-radius:20px 20px 0 0;padding:20px 18px calc(24px + env(safe-area-inset-bottom))}
-.settings-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:16px}
-.settings-head button,.close-btn{border:0;background:#f1f1f1;border-radius:10px;padding:10px 14px;font:inherit}
-.setting-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #eee}
-.setting-row label{flex:1}
-.setting-row input[type=checkbox]{width:22px;height:22px;accent-color:#111}
-.settings-group{padding:16px 0;border-bottom:1px solid #eee}
-.settings-group h3{font-size:15px;margin:0 0 10px}
-.inline-add{display:flex;gap:8px;margin:10px 0}
-.inline-add input{min-width:0;flex:1;border:1px solid #ddd;border-radius:10px;padding:10px;font:inherit}
-.inline-add button,.list-item button{border:0;background:#f1f1f1;border-radius:10px;padding:9px 12px;font:inherit}
-.list-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;gap:8px}
-.list-item button{color:#666}
-@media(min-height:700px){#text{min-height:calc(100dvh - 110px)}}
+.settings-sheet{width:min(100%,680px);max-height:86dvh;overflow:auto;background:#fff;border-radius:20px 20px 0 0;padding:20px 18px calc(24px + env(safe-area-inset-bottom))}
+.settings-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:14px}
+.settings-head button,.inline-add button,.list-item button{border:0;background:#f1f1f1;border-radius:9px;padding:9px 12px;font:inherit}
+.setting-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eee}
+.setting-row label{flex:1}.setting-row input[type=checkbox]{width:22px;height:22px;accent-color:#111}
+.settings-group{padding:14px 0;border-bottom:1px solid #eee}.settings-group h3{font-size:14px;margin:0 0 9px}
+.inline-add{display:flex;gap:8px;margin:9px 0}.inline-add input{min-width:0;flex:1;border:1px solid #ddd;border-radius:9px;padding:10px;font:inherit}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;gap:8px}
+.setting-select{border:1px solid #ddd;border-radius:8px;padding:8px;font:inherit}
+@media(min-width:700px){main{padding-left:24px;padding-right:24px}}
 </style></head>
 <body><main>
 <header>文字起こしアプリ vn.n</header>
@@ -40,18 +42,18 @@ button:disabled{opacity:.4}
 <div class="controls"><button class="btn" id="stopBtn" disabled>停止</button></div>
 <p class="hint" id="audioHint">録音音声はこの端末内で処理します。</p>
 <div id="transcriptionNotice" class="notice">日本語音声認識モデルを初期化します。</div><div id="speechNotice" class="notice hide"></div>
-<textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea><button id="copyBtn" class="transcript-copy" type="button">コピー</button>
+<div class="transcript"><div id="playbackRail"><button id="playToggle" aria-label="再生">▶</button><div id="playRail"><div id="playProgress"></div></div></div><textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea></div>
 <div class="legacy-actions"><button class="btn" id="exportBtn">TXT保存</button><button class="btn" id="saveBtn">履歴保存</button></div>
 <div class="card" id="history-card"><div id="history"></div></div>
 <audio id="audio" controls class="hide" style="width:100%"></audio><button id="downloadAudioBtn" disabled>録音を保存</button><button id="clearBtn">クリア</button><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span id="connection">準備中</span>
 </main>
-<div class="bottom-bar" aria-label="操作"><button id="shareBtn" type="button">共有</button><button id="recordBtn" type="button">開始</button><button id="settingsBtn" type="button">設定</button></div>
+<div class="bottom-bar" aria-label="操作"><button id="shareBtn" type="button" aria-label="共有">共有</button><button id="recordBtn" type="button" aria-label="録音開始">●</button><button id="settingsBtn" type="button" aria-label="設定">⚙</button></div>
 <div id="settingsPanel" role="dialog" aria-modal="true" aria-label="設定">
 <div class="settings-sheet">
 <div class="settings-head"><span>設定</span><button id="settingsClose" type="button">閉じる</button></div>
 <div class="setting-row"><label for="saveAudioSetting">録音音声を保存</label><input id="saveAudioSetting" type="checkbox"></div>
 <div class="setting-row"><label for="timestampSetting">タイムスタンプ表示</label><input id="timestampSetting" type="checkbox"></div>
-<div class="setting-row"><label for="speakerDisplaySetting">話者表示</label><input id="speakerDisplaySetting" type="checkbox"></div>
+<div class="setting-row"><label for="speakerDisplaySetting">話者表示</label><input id="speakerDisplaySetting" type="checkbox"></div><div class="settings-group"><h3>認識精度・挙動</h3><label>VAD感度 <select id="vadSensitivity" class="setting-select"><option value="0.15">高</option><option value="0.25">標準</option><option value="0.4">低</option></select></label><div class="setting-row"><label for="minSilence">無音判定 (秒)</label><select id="minSilence" class="setting-select"><option value="0.3">0.3</option><option value="0.5">0.5</option><option value="0.8">0.8</option></select></div><div class="setting-row"><label for="maxPaths">認識候補数</label><select id="maxPaths" class="setting-select"><option value="4">4</option><option value="8">8</option><option value="12">12</option></select></div></div>
 <div class="settings-group"><h3>辞書登録</h3><div class="inline-add"><input id="dictionaryInput" placeholder="単語・読みを登録"><button id="dictionaryAdd">追加</button></div><div id="dictionaryList"></div></div>
 <div class="settings-group"><h3>話者登録</h3><p style="font-size:12px;color:#777;margin:0 0 8px">登録内容は端末に保存されます。辞書の認識反映と自動話者識別は現在未接続です。</p><div class="inline-add"><input id="speakerInput" placeholder="話者名"><button id="speakerAdd">追加</button></div><div id="speakerList"></div></div>
 </div></div>
