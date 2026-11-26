@@ -111,7 +111,6 @@ jobs:
               "web/wasm/pcm-worklet.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
-              ".nojekyll",
           ]
           for name in required:
               path = root / name
