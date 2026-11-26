@@ -31,6 +31,7 @@ function setTimer(){timerEl.textContent=fmt(Date.now()-startedAt)}
 function cleanUrl(){if(audioUrl){URL.revokeObjectURL(audioUrl);audioUrl=null}}
 function workerMessage({data}){
  if(data.type==="log")return;
+ if(data.type==="options-effective"){try{const parsed=JSON.parse(data.options);console.info("ASR effective options",parsed);status("ASR設定を読み込みました")}catch(error){console.error("ASR option diagnostic parse failed",data.options,error);status("ASR設定の診断に失敗しました")}return;}
  if(data.type==="model-file-ready"){status("日本語モデルを準備中… "+data.path.split("/").pop());return}
  if(data.type==="ready"){asrReady=true;status("日本語音声認識の準備完了");return}
  if(data.type==="asr-event"){
