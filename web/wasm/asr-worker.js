@@ -90,6 +90,11 @@ self.onmessage = async ({ data }) => {
         runtime.FS.mkdirTree(modelDir);
         const paths = data.modelPaths || {};
         const resolve = (path) => path.startsWith("/") ? path : modelDir + "/" + path;
+        runtime.FS.mkdirTree("/data");
+        const voiceprintPath = "/data/voiceprints.oed";
+        const storedVoiceprints = await loadVoiceprintPack().catch(() => null);
+        if (storedVoiceprints) runtime.FS.writeFile(voiceprintPath, new Uint8Array(storedVoiceprints));
+        const effectiveOptions = [data.options || "", "embedding_model=/models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx", "voiceprint_store=" + voiceprintPath].join(";");
         const args = [
           modelDir,
           resolve(data.vadModelPath || "silero_vad.int8.onnx"),
@@ -99,11 +104,6 @@ self.onmessage = async ({ data }) => {
           resolve(paths.joiner || "joiner-epoch-99-avg-1.onnx"),
           effectiveOptions
         ];
-        runtime.FS.mkdirTree("/data");
-        const voiceprintPath = "/data/voiceprints.oed";
-        const storedVoiceprints = await loadVoiceprintPack().catch(() => null);
-        if (storedVoiceprints) runtime.FS.writeFile(voiceprintPath, new Uint8Array(storedVoiceprints));
-        const effectiveOptions = [data.options || "", "embedding_model=/models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx", "voiceprint_store=" + voiceprintPath].join(";");
         const optionPtr = runtime.stringToNewUTF8(effectiveOptions);
         const optionDump = runtime._wasm_asr_options_dump(optionPtr);
         self.postMessage({ type: "options-effective", options: runtime.UTF8ToString(optionDump) });
