@@ -113,8 +113,11 @@ self.onmessage = async ({ data }) => {
         const rc = runtime._wasm_asr_create(...ptrs);
         ptrs.forEach((ptr) => runtime._free(ptr));
         if (rc !== 0) throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));
+        const diarizationAvailable = !!runtime._wasm_asr_diarization_available();
+        const voiceprintAvailable = !!runtime._wasm_asr_voiceprint_available();
+        if (!diarizationAvailable || !voiceprintAvailable) throw new Error("Pinned ASR library reports speaker diarization/voiceprint unavailable");
         engineReady = true;
-        self.postMessage({ type: "speaker-capabilities", diarization: !!runtime._wasm_asr_diarization_available(), voiceprint: !!runtime._wasm_asr_voiceprint_available() });
+        self.postMessage({ type: "speaker-capabilities", diarization: diarizationAvailable, voiceprint: voiceprintAvailable });
         self.postMessage({ type: "speaker-profiles", profiles: jsonFrom(runtime._wasm_asr_voiceprint_profiles()) });
         self.postMessage({ type: "ready", modelDir });
         break;
