@@ -19,7 +19,7 @@ function renderSettingsListsOnce(){
  const render=(id,items,key)=>{const root=$(id);root.innerHTML="";items.forEach((value,i)=>{const row=document.createElement("div");row.className="list-item";const span=document.createElement("span");span.textContent=value;const remove=document.createElement("button");remove.textContent="削除";remove.onclick=()=>{settings[key].splice(i,1);persistSettings();renderSettingsListsOnce()};row.append(span,remove);root.append(row)})};
  render("#dictionaryList",settings.dictionary,"dictionary");const speakerRoot=$("#speakerList");speakerRoot.innerHTML="";settings.speakers.forEach((name,i)=>{const row=document.createElement("div"),label=document.createElement("span"),remove=document.createElement("button");row.className="list-item";label.textContent="話者"+(i+1)+" (ID "+i+"): "+name;remove.textContent="削除";remove.onclick=()=>{settings.speakers.splice(i,1);persistSettings();renderSettingsListsOnce()};row.append(label,remove);speakerRoot.append(row)});
 }
-function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#timestampSetting").checked=!!settings.timestamps;$("#speakerDisplaySetting").checked=!!settings.speakerDisplay;$("#vadSensitivity").value=settings.vadSensitivity;$("#minSilence").value=settings.minSilence;$("#maxPaths").value=settings.maxPaths;renderSettingsListsOnce();$("#settingsPanel").classList.add("open")}
+function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#timestampSetting").checked=!!settings.timestamps;$("#speakerDisplaySetting").checked=!!settings.speakerDisplay;$("#vadSensitivity").value=settings.vadSensitivity;$("#minSilence").value=settings.minSilence;$("#maxPaths").value=settings.maxPaths;renderSettingsListsOnce();renderSpeakerProfiles();$("#settingsPanel").classList.add("open")}
 function closeSettings(){$("#settingsPanel").classList.remove("open")}
 
 let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
@@ -49,7 +49,7 @@ function workerMessage({data}){
  if(data.type==="options-effective"){try{const parsed=JSON.parse(data.options);console.info("ASR effective options",parsed);status("ASR設定を読み込みました")}catch(error){console.error("ASR option diagnostic parse failed",data.options,error);status("ASR設定の診断に失敗しました")}return;}
  if(data.type==="model-file-ready"){status("日本語モデルを準備中… "+data.path.split("/").pop());return}
  if(data.type==="speaker-profiles"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles()}catch(e){console.warn(e)}return}
- if(data.type==="speaker-enrolled"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles()}catch{}status("声紋を登録しました ("+data.added+" サンプル)");return}
+ if(data.type==="speaker-enrolled"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles();asrWorker?.postMessage({type:"speaker-save"})}catch{}status("声紋を登録しました ("+data.added+" サンプル)");return}
  if(data.type==="speaker-saved"){status("声紋を暗号化して端末に保存しました");return}
  if(data.type==="speaker-capabilities"&&(!data.diarization||!data.voiceprint)){status("話者識別機能を初期化できませんでした");return}
  if(data.type==="ready"){asrReady=true;asrWorker?.postMessage({type:"speaker-profiles"});status("日本語音声認識・話者識別の準備完了");return}
