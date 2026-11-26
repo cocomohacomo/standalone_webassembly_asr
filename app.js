@@ -48,7 +48,11 @@ function workerMessage({data}){
  if(data.type==="log")return;
  if(data.type==="options-effective"){try{const parsed=JSON.parse(data.options);console.info("ASR effective options",parsed);status("ASR設定を読み込みました")}catch(error){console.error("ASR option diagnostic parse failed",data.options,error);status("ASR設定の診断に失敗しました")}return;}
  if(data.type==="model-file-ready"){status("日本語モデルを準備中… "+data.path.split("/").pop());return}
- if(data.type==="ready"){asrReady=true;status("日本語音声認識の準備完了");return}
+ if(data.type==="speaker-profiles"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles()}catch(e){console.warn(e)}return}
+ if(data.type==="speaker-enrolled"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles()}catch{}status("声紋を登録しました ("+data.added+" サンプル)");return}
+ if(data.type==="speaker-saved"){status("声紋を暗号化して端末に保存しました");return}
+ if(data.type==="speaker-capabilities"&&(!data.diarization||!data.voiceprint)){status("話者識別機能を初期化できませんでした");return}
+ if(data.type==="ready"){asrReady=true;asrWorker?.postMessage({type:"speaker-profiles"});status("日本語音声認識・話者識別の準備完了");return}
  if(data.type==="asr-event"){
   const event=data.event||{};
   if(event.text&&event.text.trim()){
