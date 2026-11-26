@@ -9,32 +9,41 @@ function cstr(value){return runtime.stringToNewUTF8(String(value??""))}
 function jsonFrom(ptr){return ptr?runtime.UTF8ToString(ptr):"[]"}
 async function persistVoiceprints(){const path=cstr("/data/voiceprints.oed");const rc=runtime._wasm_asr_voiceprint_save(path);runtime._free(path);if(rc<0)throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));await saveVoiceprintPack(runtime.FS.readFile("/data/voiceprints.oed"));}
 
-async function fetchModel(url) {
+async function fetchModel(url, checksum) {
   const request = new Request(url, { mode: "cors" });
-  // Model caching is an optimization, never a prerequisite for recognition.
-  // Mobile browsers may reject a 155 MB cache write due to quota pressure.
+  // Checksum-pinned assets bypass cache reads so stale/corrupt cache entries
+  // cannot prevent startup. Other model files may use cache as an optimization.
   let cache = null;
   if ("caches" in self) {
     try {
-      cache = await caches.open("voice-memo-ja-model-v2");
-      const cached = await cache.match(request);
-      if (cached) return cached;
+      cache = await caches.open("voice-memo-ja-model-v3");
+      if (!checksum) {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+      }
     } catch (error) {
       console.warn("Model cache unavailable; fetching without cache:", error);
       cache = null;
     }
   }
-  let response;
-  try { response = await fetch(request); }
-  catch (error) { throw new Error("Model network request failed: " + url + " (" + String(error?.message || error) + ")"); }
-  if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + url);
+  let response, lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      response = await fetch(request);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) throw new Error("Model network request failed after 3 attempts: " + url + " (" + String(error?.message || error) + ")");
+      await new Promise(resolve => setTimeout(resolve, 700 * (attempt + 1)));
+    }
+  }
   if (cache && (response.type === "cors" || response.type === "basic")) {
     try { await cache.put(request, response.clone()); }
     catch (error) { console.warn("Model cache write skipped:", error); }
   }
   return response;
 }
-
 async function installModelFiles(files, modelRoot) {
   const root = modelRoot || "/models";
   runtime.FS.mkdirTree(root);
@@ -49,7 +58,7 @@ async function installModelFiles(files, modelRoot) {
     const target = root + "/" + relative;
     const slash = target.lastIndexOf("/");
     if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
-    const response = await fetchModel(item.url);
+    const response = await fetchModel(item.url, item.sha256);
     if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + item.url);
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (item.sha256) {
