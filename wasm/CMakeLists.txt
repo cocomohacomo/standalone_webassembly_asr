@@ -55,7 +55,7 @@ target_include_directories(sherpa_embed_asr_wasm PRIVATE
 target_compile_options(sherpa_embed_asr_wasm PRIVATE -O3 -fexceptions)
 target_link_options(sherpa_embed_asr_wasm PRIVATE
   "-sALLOW_MEMORY_GROWTH=1"
-  "-sINITIAL_MEMORY=536870912"
+  "-sINITIAL_MEMORY=268435456"
   "-sSTACK_SIZE=8388608"
   "-sFORCE_FILESYSTEM=1"
   "-sENVIRONMENT=web,worker,node"
