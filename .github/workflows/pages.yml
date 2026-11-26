@@ -30,6 +30,13 @@ jobs:
           test -s manifest.webmanifest
           test -s VERSION
           test -s icon.svg
+          test -s THIRD_PARTY_NOTICES.md
+          test -s licenses/ASR-THIRD_PARTY_NOTICES.md
+          test -s licenses/sherpa-embed-asr.LICENSE.txt
+          test -s licenses/sherpa-onnx.LICENSE.txt
+          test -s licenses/onnxruntime.LICENSE.txt
+          test -s licenses/onnxruntime.ThirdPartyNotices.txt
+          test -s licenses/Apache-2.0.txt
           test -s web/wasm/asr-worker.js
           test -s web/wasm/pcm-worklet.js
           node --check app.js
@@ -92,7 +99,9 @@ jobs:
           # compiler output, or mutable dependency caches.
           rm -rf _site
           install -d _site/web/wasm/dist
-          install -m 0644 index.html app.js sw.js manifest.webmanifest VERSION icon.svg _site/
+          install -m 0644 index.html app.js sw.js manifest.webmanifest VERSION icon.svg THIRD_PARTY_NOTICES.md _site/
+          mkdir -p _site/licenses
+          cp -a licenses/. _site/licenses/
           install -m 0644 web/wasm/asr-worker.js web/wasm/pcm-worklet.js _site/web/wasm/
           install -m 0644 web/wasm/dist/sherpa_embed_asr_wasm.js web/wasm/dist/sherpa_embed_asr_wasm.wasm _site/web/wasm/dist/
           : > _site/.nojekyll
@@ -109,6 +118,13 @@ jobs:
               "manifest.webmanifest",
               "VERSION",
               "icon.svg",
+              "THIRD_PARTY_NOTICES.md",
+              "licenses/ASR-THIRD_PARTY_NOTICES.md",
+              "licenses/sherpa-embed-asr.LICENSE.txt",
+              "licenses/sherpa-onnx.LICENSE.txt",
+              "licenses/onnxruntime.LICENSE.txt",
+              "licenses/onnxruntime.ThirdPartyNotices.txt",
+              "licenses/Apache-2.0.txt",
               "web/wasm/asr-worker.js",
               "web/wasm/pcm-worklet.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.js",
