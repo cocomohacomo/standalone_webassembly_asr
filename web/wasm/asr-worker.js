@@ -3,23 +3,29 @@ let runtime = null;
 let engineReady = false;
 
 async function fetchModel(url) {
-  const cacheName = "voice-memo-ja-model-v1";
   const request = new Request(url, { mode: "cors" });
+  // Model caching is an optimization, never a prerequisite for recognition.
+  // Mobile browsers may reject a 155 MB cache write due to quota pressure.
+  let cache = null;
   if ("caches" in self) {
-    const cache = await caches.open(cacheName);
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    let response;
-    try { response = await fetch(request); }
-    catch (error) { throw new Error("Model network request failed: " + url + " (" + String(error?.message || error) + ")"); }
-    if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + url);
-    if (response.type === "cors" || response.type === "basic") {
-      await cache.put(request, response.clone());
+    try {
+      cache = await caches.open("voice-memo-ja-model-v2");
+      const cached = await cache.match(request);
+      if (cached) return cached;
+    } catch (error) {
+      console.warn("Model cache unavailable; fetching without cache:", error);
+      cache = null;
     }
-    return response;
   }
-  try { return await fetch(request); }
+  let response;
+  try { response = await fetch(request); }
   catch (error) { throw new Error("Model network request failed: " + url + " (" + String(error?.message || error) + ")"); }
+  if (!response.ok) throw new Error("Model fetch failed (" + response.status + "): " + url);
+  if (cache && (response.type === "cors" || response.type === "basic")) {
+    try { await cache.put(request, response.clone()); }
+    catch (error) { console.warn("Model cache write skipped:", error); }
+  }
+  return response;
 }
 
 async function installModelFiles(files, modelRoot) {
