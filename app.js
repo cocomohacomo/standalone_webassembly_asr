@@ -13,6 +13,7 @@ function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#
 function closeSettings(){$("#settingsPanel").classList.remove("open")}
 
 let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
+let transcriptSegments=[],internalTranscriptUpdate=false,settingsDirty=false;
 let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
@@ -35,7 +36,7 @@ function workerMessage({data}){
  if(data.type==="asr-event"){
   const event=data.event||{};
   if(event.text&&event.text.trim()){
-   if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";textArea.value+=(textArea.value?"\n":"")+stamp+event.text.trim()}
+   if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const prefix=textArea.value?"\n":"";const start=textArea.value.length+prefix.length+stamp.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+event.text.trim();transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+event.text.trim().length});internalTranscriptUpdate=false}
    else if(event.type===1){status("認識中… "+event.text.trim(),true)}
   }
   return;
@@ -44,6 +45,7 @@ function workerMessage({data}){
  if(data.type==="accepted"||data.type==="flushed"||data.type==="closed")return;
 }
 async function ensureAsr(){
+ if(asrReady&&settingsDirty){asrWorker?.terminate();asrWorker=null;asrReady=false;settingsDirty=false;}
  if(asrReady)return;
  if(asrStarting)return asrStarting;
  asrStarting=(async()=>{
@@ -114,7 +116,7 @@ $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const 
 $("#exportBtn").addEventListener("click",()=>{const blob=new Blob([textArea.value],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="transcription.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
 function loadHistory(){let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};historyEl.innerHTML="";if(!list.length){historyEl.innerHTML='<p class="hint">保存した履歴はここに表示されます。</p>';return}list.slice(0,30).forEach(item=>{const row=document.createElement("div");row.className="history-item";const label=document.createElement("span");label.textContent=item.date;const open=document.createElement("button");open.textContent="開く";open.onclick=()=>textArea.value=item.text;row.append(label,open);historyEl.append(row)})}
 $("#saveBtn").addEventListener("click",()=>{const value=textArea.value.trim();if(!value){status("保存するテキストがありません");return}let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};list.unshift({date:new Date().toLocaleString("ja-JP"),text:value});localStorage.setItem("voiceMemoHistory",JSON.stringify(list.slice(0,30)));loadHistory();status("履歴に保存しました")});
-$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;textArea.value="";audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";status("待機中")});
+$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;transcriptSegments=[];textArea.value="";audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";status("待機中")});
 loadHistory();
 $("#connection").textContent=navigator.onLine?"オンライン":"オフライン";
 addEventListener("online",()=>$("#connection").textContent="オンライン");addEventListener("offline",()=>$("#connection").textContent="オフライン");
@@ -127,8 +129,34 @@ $("#settingsBtn").addEventListener("click",openSettings);$("#settingsClose").add
 $("#saveAudioSetting").addEventListener("change",e=>{settings.saveAudio=e.target.checked;persistSettings();if(!settings.saveAudio){audioBlob=null;cleanUrl();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true}});
 $("#timestampSetting").addEventListener("change",e=>{settings.timestamps=e.target.checked;persistSettings()});
 $("#speakerDisplaySetting").addEventListener("change",e=>{settings.speakerDisplay=e.target.checked;persistSettings()});
-["vadSensitivity","minSilence","maxPaths"].forEach(id=>$("#"+id).addEventListener("change",e=>{settings[id]=e.target.value;persistSettings();status("認識パラメータは次回起動時に適用されます")}));
-$("#playToggle").addEventListener("click",()=>{if(!audioBlob)return;if(audioEl.paused){audioEl.play();$("#playToggle").textContent="Ⅱ"}else{audioEl.pause();$("#playToggle").textContent="▶"}});audioEl.addEventListener("timeupdate",()=>{if(audioEl.duration>0)$("#playProgress").style.height=(audioEl.currentTime/audioEl.duration*100)+"%"});audioEl.addEventListener("ended",()=>$("#playToggle").textContent="▶");
+["vadSensitivity","minSilence","maxPaths"].forEach(id=>$("#"+id).addEventListener("change",e=>{settings[id]=e.target.value;settingsDirty=true;persistSettings();status("認識パラメータは次回の録音開始時にエンジンを再初期化して適用します")}));
+function syncTranscriptToPlayback(){
+ const time=audioEl.currentTime;
+ const segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);
+ if(!segment||document.activeElement===textArea)return;
+ try{textArea.setSelectionRange(segment.start,segment.end)}catch{}
+}
+$("#playToggle").addEventListener("click",async()=>{
+ if(!audioBlob)return;
+ if(audioEl.paused){try{await audioEl.play();$("#playToggle").textContent="Ⅱ"}catch(error){status("音声を再生できません: "+(error.message||"再生エラー"))}}
+ else{audioEl.pause();$("#playToggle").textContent="▶"}
+});
+$("#playRail").addEventListener("click",event=>{
+ if(!audioBlob||!Number.isFinite(audioEl.duration)||audioEl.duration<=0)return;
+ const rect=event.currentTarget.getBoundingClientRect();
+ const ratio=Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height));
+ audioEl.currentTime=ratio*audioEl.duration;
+ syncTranscriptToPlayback();
+});
+audioEl.addEventListener("loadedmetadata",()=>{audioEl.currentTime=0;$("#playProgress").style.height="0%"});
+audioEl.addEventListener("timeupdate",()=>{
+ if(audioEl.duration>0)$("#playProgress").style.height=(audioEl.currentTime/audioEl.duration*100)+"%";
+ syncTranscriptToPlayback();
+});
+audioEl.addEventListener("play",()=>$("#playToggle").textContent="Ⅱ");
+audioEl.addEventListener("pause",()=>$("#playToggle").textContent="▶");
+audioEl.addEventListener("ended",()=>{$("#playToggle").textContent="▶";textArea.setSelectionRange(0,0)});
+textArea.addEventListener("input",()=>{if(!internalTranscriptUpdate)transcriptSegments=[]});
 $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
 $("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce()});
