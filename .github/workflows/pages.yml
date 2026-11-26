@@ -39,6 +39,10 @@ jobs:
           test -s licenses/onnxruntime.LICENSE.txt
           test -s licenses/onnxruntime.ThirdPartyNotices.txt
           test -s licenses/Apache-2.0.txt
+          test -s licenses/kaldi-native-fbank.LICENSE.txt
+          test -s licenses/audio-decoders.NOTICE.txt
+          test -s licenses/whisper-diarization-suite.NOTICE.txt
+          test -s licenses/punct_ja_cv.NOTICE.txt
           test -s web/wasm/asr-worker.js
           test -s web/wasm/pcm-worklet.js
           node --check app.js
@@ -129,6 +133,10 @@ jobs:
               "licenses/onnxruntime.LICENSE.txt",
               "licenses/onnxruntime.ThirdPartyNotices.txt",
               "licenses/Apache-2.0.txt",
+              "licenses/kaldi-native-fbank.LICENSE.txt",
+              "licenses/audio-decoders.NOTICE.txt",
+              "licenses/whisper-diarization-suite.NOTICE.txt",
+              "licenses/punct_ja_cv.NOTICE.txt",
               "web/wasm/asr-worker.js",
               "web/wasm/pcm-worklet.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.js",
