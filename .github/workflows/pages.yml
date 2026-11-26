@@ -117,6 +117,10 @@ jobs:
               path = root / name
               assert path.is_file() and path.stat().st_size > 0, f"Missing/empty artifact file: {name}"
 
+          # .nojekyll is intentionally an empty marker file.
+          nojekyll = root / ".nojekyll"
+          assert nojekyll.is_file(), "Missing Pages .nojekyll marker"
+
           manifest = json.loads((root / "manifest.webmanifest").read_text(encoding="utf-8"))
           for icon in manifest["icons"]:
               assert (root / icon["src"].removeprefix("./")).is_file(), icon["src"]
