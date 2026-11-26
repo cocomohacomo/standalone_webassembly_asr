@@ -91,6 +91,7 @@ async function stopLivePcm(){
  if(asrReady)asrWorker.postMessage({type:"flush"});
 }
 recordBtn.addEventListener("click",async()=>{
+ if(recorder?.state==="recording"){stopBtn.click();return}
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
  recordBtn.disabled=true;recordBtn.textContent="準備中";status("ASRと日本語モデルを準備しています…",true);
  try{
