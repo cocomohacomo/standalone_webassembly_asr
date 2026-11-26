@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          expected="3984a60ed89a3ce496953a08d72e232618dbec6b"
+          expected="bf5dcf89ced71456c69aaeaf8722b3e44ac1a5a6"
           actual="$(git -C vendor/sherpa-embed-asr rev-parse HEAD)"
           test "$actual" = "$expected"
           test "$(git -C vendor/sherpa-embed-asr rev-parse --is-inside-work-tree)" = "true"
