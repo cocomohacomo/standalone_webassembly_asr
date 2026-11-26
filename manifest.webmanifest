@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "文字起こしアプリ vn.n",
-  "short_name": "vn.n",
+  "name": "文字起こしアプリ vn.0.1.0",
+  "short_name": "vn.0.1.0",
   "description": "端末内音声の文字起こし",
   "start_url": "./",
   "scope": "./",
