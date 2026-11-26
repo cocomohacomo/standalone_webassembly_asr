@@ -17,7 +17,7 @@ try{settings={...settingsDefaults,...JSON.parse(localStorage.getItem("vnnSetting
 function persistSettings(){localStorage.setItem("vnnSettings",JSON.stringify(settings))}
 function renderSettingsListsOnce(){
  const render=(id,items,key)=>{const root=$(id);root.innerHTML="";items.forEach((value,i)=>{const row=document.createElement("div");row.className="list-item";const span=document.createElement("span");span.textContent=value;const remove=document.createElement("button");remove.textContent="削除";remove.onclick=()=>{settings[key].splice(i,1);persistSettings();renderSettingsListsOnce()};row.append(span,remove);root.append(row)})};
- render("#dictionaryList",settings.dictionary,"dictionary");render("#speakerList",settings.speakers,"speakers");
+ render("#dictionaryList",settings.dictionary,"dictionary");const speakerRoot=$("#speakerList");speakerRoot.innerHTML="";settings.speakers.forEach((name,i)=>{const row=document.createElement("div"),label=document.createElement("span"),remove=document.createElement("button");row.className="list-item";label.textContent="話者"+(i+1)+" (ID "+i+"): "+name;remove.textContent="削除";remove.onclick=()=>{settings.speakers.splice(i,1);persistSettings();renderSettingsListsOnce()};row.append(label,remove);speakerRoot.append(row)});
 }
 function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#timestampSetting").checked=!!settings.timestamps;$("#speakerDisplaySetting").checked=!!settings.speakerDisplay;$("#vadSensitivity").value=settings.vadSensitivity;$("#minSilence").value=settings.minSilence;$("#maxPaths").value=settings.maxPaths;renderSettingsListsOnce();$("#settingsPanel").classList.add("open")}
 function closeSettings(){$("#settingsPanel").classList.remove("open")}
@@ -164,7 +164,7 @@ audioEl.addEventListener("ended",()=>{$("#playToggle").textContent="▶";updateP
 textArea.addEventListener("input",()=>{if(!internalTranscriptUpdate){transcriptSegments=[];localStorage.removeItem("vnnTranscriptSegments")}persistTranscript()});
 $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
-$("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce()});
+$("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce();status("話者名を登録しました。分離エンジンから話者IDが返る場合に表示名を適用します")});
 $("#speakerInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#speakerAdd").click()});
 $("#shareBtn").addEventListener("click",async()=>{
  const transcript=textArea.value.trim(),files=[];
