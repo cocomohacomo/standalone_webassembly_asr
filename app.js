@@ -10,7 +10,7 @@ function persistTranscript(){try{localStorage.setItem(TRANSCRIPT_KEY,textArea.va
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
 const appVersion=$("#appVersion");
-fetch("./VERSION").then(r=>r.ok?r.text():Promise.reject()).then(v=>{appVersion.textContent=v.trim();document.title="文字起こしアプリ vn."+v.trim()}).catch(()=>{appVersion.textContent="0.1.0";document.title="文字起こしアプリ vn.0.1.0"});
+fetch("./VERSION").then(r=>r.ok?r.text():Promise.reject()).then(v=>{appVersion.textContent=v.trim();document.title="文字起こしアプリ v"+v.trim()}).catch(()=>{appVersion.textContent="0.1.0";document.title="文字起こしアプリ v0.1.0"});
 const settingsDefaults={saveAudio:true,timestamps:false,speakerDisplay:false,vadSensitivity:"0.25",minSilence:"0.5",maxPaths:"8",dictionary:[],speakers:[]};
 let settings={...settingsDefaults};
 try{settings={...settingsDefaults,...JSON.parse(localStorage.getItem("vnnSettings")||"{}")}}catch{}
@@ -145,57 +145,41 @@ $("#saveAudioSetting").addEventListener("change",e=>{settings.saveAudio=e.target
 $("#timestampSetting").addEventListener("change",e=>{settings.timestamps=e.target.checked;persistSettings()});
 $("#speakerDisplaySetting").addEventListener("change",e=>{settings.speakerDisplay=e.target.checked;persistSettings()});
 ["vadSensitivity","minSilence","maxPaths"].forEach(id=>$("#"+id).addEventListener("change",e=>{settings[id]=e.target.value;settingsDirty=true;persistSettings();status("認識パラメータは次回の録音開始時にエンジンを再初期化して適用します")}));
-function syncTranscriptToPlayback(){
- const time=audioEl.currentTime;
- const segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);
- if(!segment||document.activeElement===textArea)return;
- try{textArea.focus({preventScroll:true});textArea.setSelectionRange(segment.start,segment.end)}catch{}
-}
-$("#playToggle").addEventListener("click",async()=>{
- if(!audioBlob)return;
- if(audioEl.paused){try{await audioEl.play();$("#playToggle").textContent="Ⅱ"}catch(error){status("音声を再生できません: "+(error.message||"再生エラー"))}}
- else{audioEl.pause();$("#playToggle").textContent="▶"}
-});
-$("#playRail").addEventListener("click",event=>{
- if(!audioBlob||!Number.isFinite(audioEl.duration)||audioEl.duration<=0)return;
- const rect=event.currentTarget.getBoundingClientRect();
- const ratio=Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height));
- audioEl.currentTime=ratio*audioEl.duration;
- syncTranscriptToPlayback();
-});
-audioEl.addEventListener("loadedmetadata",()=>{audioEl.currentTime=0;$("#playProgress").style.height="0%"});
-audioEl.addEventListener("timeupdate",()=>{
- if(audioEl.duration>0)$("#playProgress").style.height=(audioEl.currentTime/audioEl.duration*100)+"%";
- syncTranscriptToPlayback();
-});
+function seekFromPointer(event){if(!audioBlob||!Number.isFinite(audioEl.duration)||audioEl.duration<=0)return;const rect=$("#playRail").getBoundingClientRect();const ratio=Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height));audioEl.currentTime=ratio*audioEl.duration;updatePlaybackCursor();syncTranscriptToPlayback(true)}
+function updatePlaybackCursor(){const ratio=audioEl.duration>0?Math.max(0,Math.min(1,audioEl.currentTime/audioEl.duration)):0;$("#playToggle").style.top=(ratio*100)+"%";$("#playToggle").setAttribute("aria-valuenow",String(Math.round(ratio*100)))}
+function syncTranscriptToPlayback(focus=false){const time=audioEl.currentTime;const segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);if(!segment)return;if(focus&&document.activeElement!==textArea)textArea.focus({preventScroll:true});try{textArea.setSelectionRange(segment.start,segment.end)}catch{}}
+$("#playToggle").addEventListener("click",async()=>{if(!audioBlob)return;if(audioEl.paused){try{await audioEl.play();$("#playToggle").textContent="Ⅱ";syncTranscriptToPlayback(true)}catch(error){status("音声を再生できません: "+(error.message||"再生エラー"))}}else{audioEl.pause();$("#playToggle").textContent="▶"}});
+let railDragging=false;
+$("#playRail").addEventListener("pointerdown",event=>{railDragging=true;event.currentTarget.setPointerCapture(event.pointerId);seekFromPointer(event)});
+$("#playRail").addEventListener("pointermove",event=>{if(railDragging)seekFromPointer(event)});
+$("#playRail").addEventListener("pointerup",()=>{railDragging=false});
+$("#playRail").addEventListener("pointercancel",()=>{railDragging=false});
+audioEl.addEventListener("loadedmetadata",()=>{audioEl.currentTime=0;updatePlaybackCursor()});
+audioEl.addEventListener("timeupdate",()=>{updatePlaybackCursor();syncTranscriptToPlayback()});
 audioEl.addEventListener("play",()=>$("#playToggle").textContent="Ⅱ");
 audioEl.addEventListener("pause",()=>$("#playToggle").textContent="▶");
-audioEl.addEventListener("ended",()=>{$("#playToggle").textContent="▶";textArea.setSelectionRange(0,0)});
+audioEl.addEventListener("ended",()=>{$("#playToggle").textContent="▶";updatePlaybackCursor();textArea.setSelectionRange(0,0)});
 textArea.addEventListener("input",()=>{if(!internalTranscriptUpdate){transcriptSegments=[];localStorage.removeItem("vnnTranscriptSegments")}persistTranscript()});
 $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
 $("#speakerAdd").addEventListener("click",()=>{const value=$("#speakerInput").value.trim();if(!value)return;if(!settings.speakers.includes(value))settings.speakers.push(value);$("#speakerInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#speakerInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#speakerAdd").click()});
 $("#shareBtn").addEventListener("click",async()=>{
- const files=[];
- if(audioBlob&&settings.saveAudio&&window.File)files.push(new File([audioBlob],"transcription-audio.webm",{type:audioBlob.type||"audio/webm"}));
- const transcript=textArea.value.trim();
+ const transcript=textArea.value.trim(),files=[];
+ if(audioBlob&&settings.saveAudio&&window.File)files.push(new File([audioBlob],"recording.webm",{type:audioBlob.type||"audio/webm"}));
  if(!transcript&&!files.length){status("共有する内容がありません");return}
+ const shareTitle="文字起こしアプリ v"+appVersion.textContent;
  try{
-  if(navigator.share){
-   const payload={title:"文字起こしアプリ vn."+appVersion.textContent,text:transcript||undefined,files:files.length?files:undefined};
-   if(!files.length||!navigator.canShare||navigator.canShare({files})){
-    await navigator.share(payload);
-   }else if(transcript){
-    await navigator.share({title:"文字起こしアプリ vn.n",text:transcript});
-   }else{
-    status("この端末では音声ファイルを共有できません");
+  if(typeof navigator.share==="function"){
+   const base={title:shareTitle,text:transcript||undefined};
+   if(files.length&&(typeof navigator.canShare!=="function"||navigator.canShare({files}))){
+    try{await navigator.share({...base,files});status("共有しました");return}
+    catch(error){if(error.name==="AbortError")return;console.warn("File share failed; retrying text-only share",error)}
    }
-  }else if(transcript){
-   await navigator.clipboard.writeText(transcript);
-   status("共有機能が未対応のためテキストをコピーしました");
-  }else{
-   status("共有機能がこのブラウザでは利用できません");
+   if(transcript){await navigator.share(base);status("テキストを共有しました");return}
   }
- }catch(e){if(e.name!=="AbortError")status("共有できませんでした")}
+  if(transcript&&navigator.clipboard&&typeof navigator.clipboard.writeText==="function"){await navigator.clipboard.writeText(transcript);status("テキストをコピーしました");return}
+  if(transcript){const blob=new Blob([transcript],{type:"text/plain;charset=utf-8"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="transcription.txt";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status("共有機能が使えないためテキストを保存しました");return}
+  if(files.length){const url=URL.createObjectURL(audioBlob),link=document.createElement("a");link.href=url;link.download="recording.webm";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status("共有機能が使えないため音声を保存しました")}
+ }catch(error){if(error.name!=="AbortError"){console.error("Share failed",error);status("共有できませんでした: "+(error.message||"共有エラー"))}}
 });
