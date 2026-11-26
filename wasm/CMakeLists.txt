@@ -61,6 +61,6 @@ target_link_options(sherpa_embed_asr_wasm PRIVATE
   "-sENVIRONMENT=web,worker,node"
   "-sMODULARIZE=1"
   "-sEXPORT_NAME=createSherpaEmbedAsr"
-  "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_options_dump','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error']"
+  "-sEXPORTED_FUNCTIONS=['_malloc','_free','_wasm_asr_options_dump','_wasm_asr_create','_wasm_asr_push_pcm','_wasm_asr_flush','_wasm_asr_destroy','_wasm_asr_last_error','_wasm_asr_diarization_available','_wasm_asr_voiceprint_available','_wasm_asr_speakers_json','_wasm_asr_voiceprint_profiles','_wasm_asr_voiceprint_suggest','_wasm_asr_enroll_speaker','_wasm_asr_rename_speaker','_wasm_asr_delete_voiceprint','_wasm_asr_label_speaker','_wasm_asr_reject_speaker','_wasm_asr_unlabel_speaker','_wasm_asr_merge_speakers','_wasm_asr_relabel','_wasm_asr_voiceprint_save']"
   "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToNewUTF8','FS','HEAPF32']")
 set_target_properties(sherpa_embed_asr_wasm PROPERTIES SUFFIX ".js")
