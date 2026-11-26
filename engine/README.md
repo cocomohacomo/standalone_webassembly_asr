@@ -12,7 +12,7 @@ GH_TOKEN=... ./scripts/clone-engine.sh
 
 The script fetches the immutable revision recorded in `scripts/clone-engine.sh`, checks out detached HEAD, verifies the exact SHA, and refuses to overwrite an existing checkout. The token is passed to Git through a transient HTTP authorization header and is not written to the repository or Git config.
 
-The checkout is intentionally ignored by Git. This avoids copying or rewriting upstream history and keeps application-specific browser/WASM integration in this repository.
+The checkout is pinned to `3984a60ed89a3ce496953a08d72e232618dbec6b`, which includes the current MIT license and updated third-party dependency notices. The corresponding notices and license texts are mirrored under the application repository's `licenses/` directory. The checkout is intentionally ignored by Git. This avoids copying or rewriting upstream history and keeps application-specific browser/WASM integration in this repository.
 
 ## Current integration boundary
 
