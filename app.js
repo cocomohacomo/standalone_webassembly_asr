@@ -123,7 +123,6 @@ installBtn.addEventListener("click",async()=>{if(!deferredInstallPrompt)return;d
 window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;installBtn.hidden=true;status("アプリをインストールしました")});
 if("serviceWorker" in navigator&&location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(error=>{console.warn("Service Worker registration failed",error);status("オフライン機能の初期化に失敗しました")})}
 
-$("#copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(textArea.value)}catch{textArea.select()}});
 $("#settingsBtn").addEventListener("click",openSettings);$("#settingsClose").addEventListener("click",closeSettings);$("#settingsPanel").addEventListener("click",e=>{if(e.target.id==="settingsPanel")closeSettings()});
 $("#saveAudioSetting").addEventListener("change",e=>{settings.saveAudio=e.target.checked;persistSettings();if(!settings.saveAudio){audioBlob=null;cleanUrl();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true}});
 $("#timestampSetting").addEventListener("change",e=>{settings.timestamps=e.target.checked;persistSettings()});
