@@ -51,6 +51,9 @@ function workerMessage({data}){
  if(data.type==="speaker-profiles"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles()}catch(e){console.warn(e)}return}
  if(data.type==="speaker-enrolled"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles();asrWorker?.postMessage({type:"speaker-save"})}catch{}status("声紋を登録しました ("+data.added+" サンプル)");return}
  if(data.type==="speaker-saved"){status("声紋を暗号化して端末に保存しました");return}
+ if(data.type==="speaker-labeled"){status("選択区間の話者ラベルを更新しました");return}
+ if(data.type==="speaker-relabeled"){status("会議全体の話者ラベルを再判定しました");return}
+ if(data.type==="speaker-merged"){status("話者を統合しました");return}
  if(data.type==="speaker-capabilities"&&(!data.diarization||!data.voiceprint)){status("話者識別機能を初期化できませんでした");return}
  if(data.type==="ready"){asrReady=true;asrWorker?.postMessage({type:"speaker-profiles"});status("日本語音声認識・話者識別の準備完了");return}
  if(data.type==="asr-event"){
