@@ -1,6 +1,7 @@
 #include <emscripten.h>
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 #include "sherpa_embed_asr/asr_c_api.h"
 
@@ -20,6 +21,7 @@ EM_JS(void, wasm_emit_asr_event,
 namespace {
 AsrEngine* g_engine = nullptr;
 std::string g_last_error;
+std::string g_options_dump;
 
 void OnAsrEvent(const AsrEvent* event, void*) {
   if (!event) return;
@@ -33,6 +35,25 @@ const char* EngineError() {
 }  // namespace
 
 extern "C" {
+
+
+EMSCRIPTEN_KEEPALIVE
+const char* wasm_asr_options_dump(const char* options) {
+  AsrConfig config;
+  asr_config_init_defaults(&config);
+  std::string effective = "parallel_workers=1;correction_suggest=0;seibunka=0";
+  if (options && *options) { effective += ";"; effective += options; }
+  std::vector<char> buffer(65536, '\0');
+  const int rc = asr_options_dump(&config, effective.c_str(), buffer.data(),
+                                  static_cast<int32_t>(buffer.size()));
+  if (rc < 0) {
+    g_options_dump = std::string("{\"error\":\"") + buffer.data() + "\"}";
+  } else {
+    g_options_dump.assign(buffer.data());
+  }
+  return g_options_dump.c_str();
+}
+
 
 EMSCRIPTEN_KEEPALIVE
 int wasm_asr_create(const char* model_dir, const char* vad_model_path,
