@@ -9,45 +9,49 @@ function cstr(value){return runtime.stringToNewUTF8(String(value??""))}
 function jsonFrom(ptr){return ptr?runtime.UTF8ToString(ptr):"[]"}
 async function persistVoiceprints(){const path=cstr("/data/voiceprints.oed");const rc=runtime._wasm_asr_voiceprint_save(path);runtime._free(path);if(rc<0)throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));await saveVoiceprintPack(runtime.FS.readFile("/data/voiceprints.oed"));}
 
-async function fetchModel(url, checksum) {
-  const request = new Request(url, { mode: "cors" });
-  let cache = null;
-  if ("caches" in self) {
-    try {
-      cache = await caches.open("voice-memo-ja-model-v4");
-      if (!checksum) {
-        const cached = await cache.match(request);
-        if (cached && cached.ok && (await cached.clone().arrayBuffer()).byteLength > 0) return cached;
-        if (cached) await cache.delete(request);
+async function fetchModel(url, checksum, fallbackUrl) {
+  const candidates = [url, ...(fallbackUrl && fallbackUrl !== url ? [fallbackUrl] : [])];
+  let lastError = null;
+  for (const candidate of candidates) {
+    const request = new Request(candidate, { mode: "cors" });
+    let cache = null;
+    if ("caches" in self) {
+      try {
+        cache = await caches.open("voice-memo-ja-model-v5");
+        if (!checksum) {
+          const cached = await cache.match(request);
+          if (cached && cached.ok && (await cached.clone().arrayBuffer()).byteLength > 0) return cached;
+          if (cached) await cache.delete(request);
+        }
+      } catch (error) {
+        console.warn("Model cache unavailable; fetching without cache:", error);
+        cache = null;
       }
-    } catch (error) {
-      console.warn("Model cache unavailable; fetching without cache:", error);
-      cache = null;
     }
-  }
-  let response;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
-    try {
-      response = await fetch(request, { signal: controller.signal });
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      if ((await response.clone().arrayBuffer()).byteLength === 0) throw new Error("Empty response");
-      clearTimeout(timeoutId);
-      break;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      const reason = error?.name === "AbortError" ? "120s timeout" : String(error?.message || error);
-      if (attempt === 2) throw new Error("Download failed after 3 attempts: " + url + " (" + reason + ")");
-      console.warn("Model fetch retry", attempt + 1, url, reason);
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      try {
+        const response = await fetch(request, { signal: controller.signal });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        if ((await response.clone().arrayBuffer()).byteLength === 0) throw new Error("Empty response");
+        clearTimeout(timeoutId);
+        if (cache && (response.type === "cors" || response.type === "basic")) {
+          try { await cache.put(request, response.clone()); }
+          catch (error) { console.warn("Model cache write skipped:", error); }
+        }
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+        const reason = error?.name === "AbortError" ? "120s timeout" : String(error?.message || error);
+        console.warn("Model fetch retry", attempt + 1, candidate, reason);
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
     }
+    console.warn("Model source unavailable; trying fallback:", candidate, lastError);
   }
-  if (cache && (response.type === "cors" || response.type === "basic")) {
-    try { await cache.put(request, response.clone()); }
-    catch (error) { console.warn("Model cache write skipped:", error); }
-  }
-  return response;
+  throw new Error("Download failed for all model sources: " + candidates.join(" | ") + " (" + String(lastError?.message || lastError) + ")");
 }
 async function installModelFiles(files, modelRoot) {
   const root = modelRoot || "/models";
@@ -61,7 +65,7 @@ async function installModelFiles(files, modelRoot) {
     const slash = target.lastIndexOf("/");
     if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
     try {
-      const response = await fetchModel(item.url, item.sha256);
+      const response = await fetchModel(item.url, item.sha256, item.fallbackUrl);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (!bytes.length) throw new Error("Downloaded file is empty");
       if (item.sha256) {
