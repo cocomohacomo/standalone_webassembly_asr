@@ -1,51 +1,58 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#10241f">
-  <meta name="description" content="端末内で録音し、文字起こしを保存するオフライン対応音声メモ。">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="./icon.svg">
-  <title>声メモ | Offline ASR</title>
-  <style>
-    :root{color-scheme:dark;--bg:#0c1514;--panel:#152321;--line:#29413b;--muted:#9ab1a8;--green:#8de0b5;--text:#edf6f1;--red:#ff8c86}
-    *{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 50% -20%,#23453a 0%,var(--bg) 65%);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Noto Sans JP",sans-serif;min-height:100dvh}
-    main{max-width:680px;margin:auto;padding:calc(20px + env(safe-area-inset-top)) 18px calc(32px + env(safe-area-inset-bottom))}
-    header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 24px}.brand{font-weight:800;font-size:20px;letter-spacing:.02em}.brand span{color:var(--green)}.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 10px;color:var(--muted)}
-    .card{background:rgba(21,35,33,.94);border:1px solid var(--line);border-radius:20px;padding:18px;margin:14px 0;box-shadow:0 14px 40px #0002}
-    .status{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:14px}.dot{width:9px;height:9px;border-radius:50%;background:#71827c}.dot.active{background:#ff6f66;box-shadow:0 0 12px #ff6f6680;animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.4}}
-    .timer{text-align:center;font-size:42px;font-weight:700;font-variant-numeric:tabular-nums;margin:12px 0 8px}.controls{display:flex;justify-content:center;gap:12px;margin:18px 0 8px}.btn{border:1px solid var(--line);background:#223a34;color:var(--text);border-radius:14px;padding:14px 20px;font:inherit;font-weight:700;min-height:52px;cursor:pointer}.btn.primary{background:var(--green);color:#10241d;border:0;min-width:150px}.btn:disabled{opacity:.45;cursor:default}.btn.install{min-height:36px;padding:6px 12px;font-size:12px;border-color:var(--green);color:var(--green)}.hint{font-size:13px;color:var(--muted);margin:10px 0 0}.section-title{font-size:15px;font-weight:700;margin:0 0 12px}.textarea{width:100%;min-height:180px;resize:vertical;background:#0e1917;border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--text);font:inherit;line-height:1.7;outline:none}.textarea:focus{border-color:var(--green)}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.row .btn{flex:1;font-size:14px;padding:11px}.history-item{padding:12px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:center}.history-item:first-child{border-top:0}.history-item button{border:0;background:transparent;color:var(--green);font:inherit;cursor:pointer}.notice{border-left:3px solid #d8b56b;padding:10px 12px;background:#2b271b;border-radius:8px;color:#e5d4a5;font-size:13px;margin-top:12px}.hide{display:none!important}footer{text-align:center;color:var(--muted);font-size:12px;margin:22px 0}a{color:var(--green)}
-  </style>
-</head>
-<body>
-<main>
-<header><div class="brand">声<span>メモ</span></div><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span class="chip" id="connection">準備中</span></header>
-<div class="card">
-  <div class="status"><span class="dot" id="recordDot"></span><span id="statusText">録音待機中</span></div>
-  <div class="timer" id="timer">00:00</div>
-  <div class="controls"><button class="btn primary" id="recordBtn">● 録音開始</button><button class="btn" id="stopBtn" disabled>■ 停止</button></div>
-  <p class="hint" id="audioHint">録音音声はこの端末内で保存します。マイクの許可が必要です。</p>
-  <div id="transcriptionNotice" class="notice">初回は日本語モデル（約180MB）をダウンロードします。以後は端末内キャッシュからオフライン利用できます。WASM本体の配備が必要です。</div>
-  <div id="speechNotice" class="notice hide">ブラウザの音声認識を試しています。これはオンライン認識の場合があり、オフラインWASM認識ではありません。</div>
-</div>
-<div class="card">
-  <p class="section-title">文字起こし</p>
-  <textarea class="textarea" id="text" placeholder="認識結果やメモをここに入力・編集できます…" aria-label="文字起こしテキスト"></textarea>
-  <div class="row"><button class="btn" id="copyBtn">コピー</button><button class="btn" id="exportBtn">TXT保存</button><button class="btn" id="saveBtn">履歴に保存</button></div>
-</div>
-<div class="card">
-  <p class="section-title">録音データ</p>
-  <audio id="audio" controls class="hide" style="width:100%"></audio>
-  <div class="row"><button class="btn" id="downloadAudioBtn" disabled>録音を保存</button><button class="btn" id="clearBtn">クリア</button></div>
-  <p class="hint">録音ファイルは保存ボタンから端末へダウンロードできます。</p>
-</div>
-<div class="card">
-  <p class="section-title">保存したメモ</p>
-  <div id="history"><p class="hint">保存した履歴はここに表示されます。</p></div>
-</div>
-<footer>Offline-first prototype · 音声データは外部送信しません（録音機能）</footer>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff"><meta name="description" content="端末内で音声を文字起こしするアプリ">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="./icon.svg">
+<title>文字起こしアプリ vn.n</title>
+<style>
+:root{color-scheme:light;--text:#111;--muted:#777;--line:#e5e5e5;--surface:#fff;--accent:#111}
+*{box-sizing:border-box}body{margin:0;background:var(--surface);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Noto Sans JP",sans-serif;min-height:100dvh}
+main{max-width:760px;margin:auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(112px + env(safe-area-inset-bottom))}
+header{padding:10px 0 18px;font-size:18px;font-weight:600;letter-spacing:.01em}
+#text{display:block;width:100%;min-height:calc(100dvh - 130px);resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font:inherit;line-height:1.8;padding:8px 0 32px}
+#text::placeholder{color:#b0b0b0}
+.bottom-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 5px 22px #0001;z-index:10;width:min(calc(100% - 28px),430px)}
+.bottom-bar button{flex:1;min-height:48px;border:0;background:#f3f3f3;border-radius:12px;color:#111;font:inherit;font-weight:600;cursor:pointer}
+.bottom-bar #recordBtn{background:#111;color:#fff}
+button:disabled{opacity:.4}
+#statusText,#timer,#recordDot,#stopBtn,.legacy-actions,#history-card,#installBtn,.notice,.hint,.section-title,#audioHint{display:none!important}
+#settingsPanel{position:fixed;inset:0;z-index:20;background:#0005;display:none;align-items:flex-end;justify-content:center}
+#settingsPanel.open{display:flex}
+.settings-sheet{width:min(100%,680px);max-height:85dvh;overflow:auto;background:#fff;border-radius:20px 20px 0 0;padding:20px 18px calc(24px + env(safe-area-inset-bottom))}
+.settings-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:16px}
+.settings-head button,.close-btn{border:0;background:#f1f1f1;border-radius:10px;padding:10px 14px;font:inherit}
+.setting-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #eee}
+.setting-row label{flex:1}
+.setting-row input[type=checkbox]{width:22px;height:22px;accent-color:#111}
+.settings-group{padding:16px 0;border-bottom:1px solid #eee}
+.settings-group h3{font-size:15px;margin:0 0 10px}
+.inline-add{display:flex;gap:8px;margin:10px 0}
+.inline-add input{min-width:0;flex:1;border:1px solid #ddd;border-radius:10px;padding:10px;font:inherit}
+.inline-add button,.list-item button{border:0;background:#f1f1f1;border-radius:10px;padding:9px 12px;font:inherit}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;gap:8px}
+.list-item button{color:#666}
+@media(min-height:700px){#text{min-height:calc(100dvh - 110px)}}
+</style></head>
+<body><main>
+<header>文字起こしアプリ vn.n</header>
+<div class="status"><span class="dot" id="recordDot"></span><span id="statusText">録音待機中</span></div><div class="timer" id="timer">00:00</div>
+<div class="controls"><button class="btn primary" id="recordBtn">開始</button><button class="btn" id="stopBtn" disabled>停止</button></div>
+<p class="hint" id="audioHint">録音音声はこの端末内で処理します。</p>
+<div id="transcriptionNotice" class="notice">日本語音声認識モデルを初期化します。</div><div id="speechNotice" class="notice hide"></div>
+<textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea>
+<div class="legacy-actions"><button class="btn" id="copyBtn">コピー</button><button class="btn" id="exportBtn">TXT保存</button><button class="btn" id="saveBtn">履歴保存</button></div>
+<div class="card" id="history-card"><div id="history"></div></div>
+<audio id="audio" controls class="hide" style="width:100%"></audio><button id="downloadAudioBtn" disabled>録音を保存</button><button id="clearBtn">クリア</button><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span id="connection">準備中</span>
 </main>
-<script src="./app.js"></script>
-</body></html>
+<div class="bottom-bar" aria-label="操作"><button id="shareBtn" type="button">共有</button><button id="recordBtn" type="button">開始</button><button id="settingsBtn" type="button">設定</button></div>
+<div id="settingsPanel" role="dialog" aria-modal="true" aria-label="設定">
+<div class="settings-sheet">
+<div class="settings-head"><span>設定</span><button id="settingsClose" type="button">閉じる</button></div>
+<div class="setting-row"><label for="saveAudioSetting">録音音声を保存</label><input id="saveAudioSetting" type="checkbox"></div>
+<div class="setting-row"><label for="timestampSetting">タイムスタンプ表示</label><input id="timestampSetting" type="checkbox"></div>
+<div class="setting-row"><label for="speakerDisplaySetting">話者表示</label><input id="speakerDisplaySetting" type="checkbox"></div>
+<div class="settings-group"><h3>辞書登録</h3><div class="inline-add"><input id="dictionaryInput" placeholder="単語・読みを登録"><button id="dictionaryAdd">追加</button></div><div id="dictionaryList"></div></div>
+<div class="settings-group"><h3>話者登録</h3><div class="inline-add"><input id="speakerInput" placeholder="話者名"><button id="speakerAdd">追加</button></div><div id="speakerList"></div></div>
+</div></div>
+<script src="./app.js"></script></body></html>
