@@ -1,0 +1,57 @@
+name: Speaker model integrity and ONNX load test
+on:
+  push:
+    paths:
+      - ".github/workflows/speaker-model-load-test.yml"
+      - "app.js"
+      - "web/wasm/asr-worker.js"
+  workflow_dispatch:
+
+jobs:
+  speaker-model-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ONNX Runtime
+        run: python -m pip install --disable-pip-version-check onnxruntime
+      - name: Download pinned CAM++ model and verify SHA-256
+        env:
+          MODEL_URL: https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/8be2a75c9ed7a590538b268e46fbb65e1aa9d208/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx
+          EXPECTED_SHA256: f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11
+        run: |
+          python - <<'PY'
+          import hashlib, os, urllib.request
+          url = os.environ["MODEL_URL"]
+          expected = os.environ["EXPECTED_SHA256"]
+          target = "speaker_model.onnx"
+          digest = hashlib.sha256()
+          size = 0
+          with urllib.request.urlopen(url, timeout=120) as response, open(target, "wb") as out:
+              print("HTTP status:", response.status)
+              while True:
+                  chunk = response.read(1024 * 1024)
+                  if not chunk:
+                      break
+                  out.write(chunk)
+                  digest.update(chunk)
+                  size += len(chunk)
+          actual = digest.hexdigest()
+          print("Downloaded bytes:", size)
+          print("SHA-256:", actual)
+          if actual != expected:
+              raise SystemExit(f"SHA-256 mismatch: expected {expected}, got {actual}")
+          print("SHA-256 integrity: PASS")
+          PY
+      - name: Load model in ONNX Runtime CPU
+        run: |
+          python - <<'PY'
+          import onnxruntime as ort
+          session = ort.InferenceSession("speaker_model.onnx", providers=["CPUExecutionProvider"])
+          print("ONNX Runtime:", ort.__version__)
+          print("Providers:", session.get_providers())
+          print("Inputs:", [(x.name, x.shape, x.type) for x in session.get_inputs()])
+          print("Outputs:", [(x.name, x.shape, x.type) for x in session.get_outputs()])
+          assert "CPUExecutionProvider" in session.get_providers()
+          print("CAM++ MODEL LOAD: PASS")
+          PY
