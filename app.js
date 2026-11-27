@@ -5,7 +5,17 @@ function openLocalDb(){return new Promise((resolve,reject)=>{const req=indexedDB
 async function saveAudioLocally(blob){if(!blob)return;const db=await openLocalDb();await new Promise((resolve,reject)=>{const tx=db.transaction(AUDIO_STORE,"readwrite");tx.objectStore(AUDIO_STORE).put(blob,"latest");tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}
 async function loadAudioLocally(){const db=await openLocalDb();const blob=await new Promise((resolve,reject)=>{const tx=db.transaction(AUDIO_STORE,"readonly");const req=tx.objectStore(AUDIO_STORE).get("latest");req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return blob}
 async function clearAudioLocally(){try{const db=await openLocalDb();await new Promise((resolve,reject)=>{const tx=db.transaction(AUDIO_STORE,"readwrite");tx.objectStore(AUDIO_STORE).delete("latest");tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch(error){console.warn("Local audio cleanup failed",error)}}
-function persistTranscript(){try{localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}catch(error){console.warn("Transcript persistence failed",error)}}
+let transcriptPersistTimer=0;
+function persistTranscript(){
+ if(transcriptPersistTimer)clearTimeout(transcriptPersistTimer);
+ transcriptPersistTimer=setTimeout(()=>{
+  transcriptPersistTimer=0;
+  try{
+   localStorage.setItem(TRANSCRIPT_KEY,textArea.value);
+   localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments));
+  }catch(error){console.warn("Transcript persistence failed",error)}
+ },350);
+}
 
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
@@ -64,7 +74,7 @@ function workerMessage({data}){
   if(event.type===9){const seg=transcriptSegments.find(x=>Math.abs(x.t0-Number(event.t0))<0.03&&Math.abs(x.t1-Number(event.t1))<0.03);if(seg){const label=settings.speakerDisplay?(event.speakerName?"["+event.speakerName+"] ":event.speaker?"["+event.speaker+"] ":""):"";const oldLength=seg.labelEnd-seg.labelStart;internalTranscriptUpdate=true;textArea.setRangeText(label,seg.labelStart,seg.labelEnd,"preserve");const delta=label.length-oldLength;seg.labelEnd=seg.labelStart+label.length;seg.start+=delta;seg.end+=delta;seg.speaker=event.speaker||"";seg.speakerName=event.speakerName||"";for(const item of transcriptSegments){if(item!==seg&&item.start>=seg.end-delta){item.start+=delta;item.end+=delta;item.labelStart+=delta;item.labelEnd+=delta}}internalTranscriptUpdate=false;persistTranscript();try{localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments))}catch{}}return}
   if(event.type===8){status("複数話者の重なりを検出しました");return}
   if(event.text&&event.text.trim()){
-   if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const speakerId=String(event.speaker??"").trim();const speakerName=event.speakerStatus==="identified"?String(event.speakerName||""):"";const speakerLabel=settings.speakerDisplay?(speakerName?"["+speakerName+"] ":speakerId?"["+speakerId+"] ":""):"";const prefix=textArea.value?"\n":"";const labelStart=textArea.value.length+prefix.length+stamp.length;const start=labelStart+speakerLabel.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+speakerLabel+event.text.trim();transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+event.text.trim().length,labelStart,labelEnd:start,speaker:speakerId,speakerName});internalTranscriptUpdate=false;persistTranscript();try{localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments))}catch{}}
+    if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const speakerId=String(event.speaker??"").trim();const speakerName=event.speakerStatus==="identified"?String(event.speakerName||""):"";const speakerLabel=settings.speakerDisplay?(speakerName?"["+speakerName+"] ":speakerId?"["+speakerId+"] ":""):"";const recognizedText=String(event.text).replace(/\\\\r\\\\n/g,"\n").replace(/\\\\n/g,"\n").replace(/\\\\r/g,"\n").trim();const prefix=textArea.value?"\n":"";const labelStart=textArea.value.length+prefix.length+stamp.length;const start=labelStart+speakerLabel.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+speakerLabel+recognizedText;transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+recognizedText.length,labelStart,labelEnd:start,speaker:speakerId,speakerName});internalTranscriptUpdate=false;persistTranscript()}
    else if(event.type===1){status("認識中… "+event.text.trim(),true)}
   }
   return;
@@ -113,7 +123,7 @@ async function startLivePcm(stream){
  await audioContext.audioWorklet.addModule("./web/wasm/pcm-worklet.js");
  sourceNode=audioContext.createMediaStreamSource(stream);
  workletNode=new AudioWorkletNode(audioContext,"pcm-16k-processor",{numberOfInputs:1,numberOfOutputs:1,channelCount:1});
- workletNode.port.onmessage=({data})=>{if(data.type==="pcm"&&asrReady){const copy=new Float32Array(data.samples);enrollmentChunks.push(copy);enrollmentSamples+=copy.length;while(enrollmentSamples>ENROLLMENT_MAX_SAMPLES&&enrollmentChunks.length){enrollmentSamples-=enrollmentChunks[0].length;enrollmentChunks.shift()}asrWorker.postMessage({type:"audio",samples:data.samples},[data.samples.buffer]);}};
+ workletNode.port.onmessage=({data})=>{if(data.type!=="pcm"||!asrReady)return;const samples=data.samples;if(enrollmentSamples<ENROLLMENT_MAX_SAMPLES){const keep=Math.min(samples.length,ENROLLMENT_MAX_SAMPLES-enrollmentSamples);if(keep>0){enrollmentChunks.push(samples.subarray(0,keep).slice());enrollmentSamples+=keep}}asrWorker.postMessage({type:"audio",samples},[samples.buffer]);};
  sourceNode.connect(workletNode);
  // Keep the processing graph alive without sending microphone audio to speakers.
  const silent=audioContext.createGain();silent.gain.value=0;
@@ -138,7 +148,7 @@ recordBtn.addEventListener("click",async()=>{
   chunks=[];enrollmentChunks=[];enrollmentSamples=0;audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
   recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
   recorder.onstop=async()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){try{await saveAudioLocally(audioBlob)}catch(error){console.warn("Audio persistence failed",error);status("録音音声を端末に保存できませんでした")}audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.currentTime=0;audioEl.load();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex"}else{await clearAudioLocally();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none"}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false};
-  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,250);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
+  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,1000);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
  }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.textContent="開始";recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
 });
 stopBtn.addEventListener("click",async()=>{
