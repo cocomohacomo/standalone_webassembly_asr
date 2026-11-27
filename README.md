@@ -43,17 +43,19 @@ for this initial target. This archive build alone is not yet browser inference.
 
 1. Open the deployed site in Chrome over HTTPS.
 2. Use the in-app **アプリをインストール** prompt when Chrome exposes it, or Chrome's menu → **Install app**.
-3. Launch from the home screen.
-4. After the first successful load, open once while online so the Service Worker can cache the app shell; then enable airplane mode and relaunch to test offline startup.
+3. Launch from the home screen while online.
+4. Start recording once and allow the complete ASR/VAD/CAM++ model preparation to finish. Wait for “全6モデルを端末内に保存しました” and “日本語音声認識・話者識別の準備完了”.
+5. Close and relaunch the installed app in airplane mode. The Service Worker supplies the app/WASM runtime and IndexedDB supplies the verified model files.
+6. Test recording and transcription in airplane mode.
 
-The app shell is cached locally. Microphone recording requires a secure context and user permission. Browser storage may still be cleared by the OS. Offline startup does not mean the ASR engine is available yet.
+The app shell and compiled WASM runtime are precached by the Service Worker. On the first online ASR initialization, all six model assets are downloaded, SHA-256 checked when a pinned digest is available, hashed, and persisted in IndexedDB. Later ASR initialization reads and re-hashes the local IndexedDB copies before any network access. Complete the first model preparation while online, wait for the app to report that all models are stored, then relaunch in airplane mode. Microphone recording still requires a secure context and user permission. Browser storage can be evicted by the OS; the app requests persistent storage but the browser may deny it. If storage is cleared, the models must be prepared again online.
 
 ## Roadmap
 
 1. Build and pin the sherpa-onnx Emscripten C API dependency.
 2. Complete the C ABI-to-WASM exports and browser-safe streaming interface.
-3. Run the engine in a Web Worker and add offline model caching.
-4. Validate recognition correctness, memory, latency, and Android Chrome behavior on real devices.
+3. Persist verified model assets in IndexedDB and precache the WASM runtime for offline startup.
+4. Validate recognition correctness, memory, latency, storage eviction recovery, and Android Chrome behavior on real devices.
 
 
 ## License and model notices
