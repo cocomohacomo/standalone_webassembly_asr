@@ -32,13 +32,13 @@ let enrollmentChunks=[],enrollmentSamples=0,speakerProfiles=[];const ENROLLMENT_
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
 const MODEL_FILES=[
- // Prefer repository-local, versioned assets. Remote URLs remain temporary fallbacks until all LFS objects are committed.
- {url:"../../models/ja/tokens.txt",fallbackUrl:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
- {url:"../../models/silero_vad.onnx",fallbackUrl:"https://huggingface.co/daxpatel235/silero-vad/resolve/main/silero_vad.onnx",path:"silero_vad.onnx",sha256:"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"},
- {url:"../../models/ja/encoder-epoch-99-avg-1.int8.onnx",fallbackUrl:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
- {url:"../../models/ja/decoder-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
- {url:"../../models/ja/joiner-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
- {url:"../../models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",fallbackUrl:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/8be2a75c9ed7a590538b268e46fbb65e1aa9d208/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
+ // Prefer same-origin bundled assets. After first verified download, IndexedDB is the authoritative offline source.
+ {url:"./models/ja/tokens.txt",fallbackUrl:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
+ {url:"./models/silero_vad.onnx",fallbackUrl:"https://huggingface.co/daxpatel235/silero-vad/resolve/main/silero_vad.onnx",path:"silero_vad.onnx",sha256:"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"},
+ {url:"./models/ja/encoder-epoch-99-avg-1.int8.onnx",fallbackUrl:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
+ {url:"./models/ja/decoder-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"decoder-epoch-99-avg-1.onnx",path:"ja/decoder-epoch-99-avg-1.onnx"},
+ {url:"./models/ja/joiner-epoch-99-avg-1.onnx",fallbackUrl:MODEL_BASE+"joiner-epoch-99-avg-1.onnx",path:"ja/joiner-epoch-99-avg-1.onnx"},
+ {url:"./models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",fallbackUrl:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/8be2a75c9ed7a590538b268e46fbb65e1aa9d208/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
 ];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
 function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
@@ -47,7 +47,10 @@ function cleanUrl(){if(audioUrl){URL.revokeObjectURL(audioUrl);audioUrl=null}}
 function workerMessage({data}){
  if(data.type==="log")return;
  if(data.type==="options-effective"){try{const parsed=JSON.parse(data.options);console.info("ASR effective options",parsed);status("ASR設定を読み込みました")}catch(error){console.error("ASR option diagnostic parse failed",data.options,error);status("ASR設定の診断に失敗しました")}return;}
- if(data.type==="model-file-ready"){status("日本語モデルを準備中… "+data.path.split("/").pop());return}
+ if(data.type==="model-file-ready"){status("モデル準備 "+data.completed+"/"+data.total+"："+data.path.split("/").pop(),true);return}
+ if(data.type==="model-cache-hit"){status("端末内モデルを復元中… "+data.path.split("/").pop(),true);return}
+ if(data.type==="model-cached"){status("モデルを端末に保存しました："+data.path.split("/").pop(),true);return}
+ if(data.type==="models-ready"){status("全"+data.count+"モデルを端末内に保存しました");return}
  if(data.type==="speaker-profiles"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles()}catch(e){console.warn(e)}return}
  if(data.type==="speaker-enrolled"){try{speakerProfiles=JSON.parse(data.profiles||"[]");renderSpeakerProfiles();asrWorker?.postMessage({type:"speaker-save"})}catch{}status("声紋を登録しました ("+data.added+" サンプル)");return}
  if(data.type==="speaker-saved"){status("声紋を暗号化して端末に保存しました");return}
@@ -124,11 +127,12 @@ async function stopLivePcm(){
 recordBtn.addEventListener("click",async()=>{
  if(recorder?.state==="recording"){stopBtn.click();return}
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
- recordBtn.disabled=true;recordBtn.textContent="…";if(!asrReady&&!confirm("日本語音声認識モデルが未準備です。初回は約155MBのモデルをダウンロードします。続行しますか？")){recordBtn.disabled=false;recordBtn.textContent="●";return}status("ASRと日本語モデルを準備しています…",true);
+ recordBtn.disabled=true;recordBtn.textContent="…";if(!asrReady&&!confirm("初回は日本語ASR・VAD・話者識別モデルをダウンロードして端末に保存します。完了後はオフラインで利用できます。続行しますか？")){recordBtn.disabled=false;recordBtn.textContent="●";return}status("ASRと日本語モデルを準備しています…",true);
  try{
   mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   audioContext=new AudioContext({latencyHint:"interactive"});
   await audioContext.resume();
+  if(navigator.storage?.persist){try{const persisted=await navigator.storage.persist();console.info("Persistent storage granted:",persisted)}catch(error){console.warn("Persistent storage request failed:",error)}}
   await ensureAsr();
   await startLivePcm(mediaStream);
   chunks=[];enrollmentChunks=[];enrollmentSamples=0;audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
