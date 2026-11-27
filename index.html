@@ -15,15 +15,15 @@ header{position:fixed;top:0;left:0;right:0;z-index:15;height:calc(66px + env(saf
 .header-actions button:active{background:#f2f2f2}
 #appVersion{font-size:12px;color:#777;font-weight:500;margin-left:3px}
 .status{display:none}#statusText{font-size:12px;color:var(--muted)}
-.transcript{display:flex;gap:5px;align-items:flex-start}.transcript.has-playback{padding-left:44px}
-#playbackRail{position:fixed;top:calc(66px + env(safe-area-inset-top));bottom:calc(82px + env(safe-area-inset-bottom));left:calc((100vw - min(800px,100vw))/2 + 12px);z-index:8;width:40px;display:none;align-items:stretch;justify-content:center;padding:12px 2px;min-height:0;height:auto;background:#fff9;backdrop-filter:blur(5px);border-radius:10px}
-#playRail{position:relative;display:block;width:36px;min-height:0;height:100%;flex:1 1 auto;background:transparent;border-radius:2px;overflow:visible;margin:0 auto;touch-action:none;cursor:ns-resize;outline:none}
-#playRail::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:2px;transform:translateX(-50%);background:#e8e8e8;border-radius:2px;pointer-events:none}
-#playProgress{position:absolute;left:calc(50% - 1px);top:0;width:2px;height:0;background:#171717;border-radius:2px;pointer-events:none}
-#playToggle{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:2;display:grid;place-items:center;width:22px;height:22px;padding:0;border:2px solid #fff;border-radius:50%;background:#171717;color:#fff;font-size:9px;font-weight:700;line-height:1;box-shadow:0 0 0 1px #17171755,0 1px 3px #0002;touch-action:none;cursor:grab}
+.transcript{display:block;min-width:0;width:100%}.transcript.has-playback{padding-right:36px}
+#playbackRail{position:fixed;top:calc(78px + env(safe-area-inset-top));bottom:calc(82px + env(safe-area-inset-bottom));right:max(8px,calc((100vw - 800px)/2 + 8px));left:auto;z-index:8;width:24px;display:none;align-items:stretch;justify-content:center;padding:8px 0;min-height:0;height:auto;background:transparent;border-radius:0}
+#playRail{position:relative;display:block;width:24px;min-width:24px;min-height:0;height:100%;flex:1 1 auto;background:transparent;border-radius:2px;overflow:visible;margin:0 auto;touch-action:none;cursor:ns-resize;outline:none}
+#playRail::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:3px;transform:translateX(-50%);background:#e8e8e8;border-radius:2px;pointer-events:none}
+#playProgress{position:absolute;left:calc(50% - 1.5px);top:0;width:3px;height:0;background:#171717;border-radius:2px;pointer-events:none}
+#playToggle{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:2;display:grid;place-items:center;width:20px;height:20px;padding:0;border:2px solid #fff;border-radius:50%;background:#171717;color:#fff;font-size:9px;font-weight:700;line-height:1;box-shadow:0 0 0 1px #17171755,0 1px 3px #0002;touch-action:none;cursor:grab}
 #playToggle:active{cursor:grabbing;transform:translate(-50%,-50%) scale(1.08)}
 #playRail:focus-visible #playToggle{box-shadow:0 0 0 4px #1112,0 0 0 1px #111}
-#text{display:block;width:100%;height:auto;min-height:3.6em;max-height:none;overflow:hidden;resize:none;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;line-height:1.8;padding:2px 0 32px;white-space:pre-wrap;overflow-wrap:anywhere}
+#text{display:block;box-sizing:border-box;min-width:0;width:100%;height:auto;min-height:3.6em;max-height:none;overflow:hidden;resize:none;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;line-height:1.8;padding:2px 0 32px;white-space:pre-wrap;overflow-wrap:anywhere}
 #text::placeholder{color:#aaa}
 #clearBtn{position:absolute;right:18px;bottom:calc(116px + env(safe-area-inset-bottom));border:0;background:transparent;color:#888;font-size:12px;padding:8px}
 .bottom-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:0;padding:0;background:transparent;border-radius:0;z-index:10}
@@ -44,7 +44,7 @@ button:disabled{opacity:.4}
 .hide{display:none!important}
 #timer,#recordDot,.controls,.hint,.notice,.legacy-actions,#history-card,#downloadAudioBtn,#installBtn,#connection{display:none!important}
 #clearBtn{bottom:calc(116px + env(safe-area-inset-bottom))}
-#playRail{cursor:ns-resize;touch-action:none}
+#playRail{cursor:ns-resize;touch-action:none;user-select:none;-webkit-user-select:none}
 @media(min-width:700px){main{padding-left:24px;padding-right:24px}}
 </style></head>
 <body><main>
