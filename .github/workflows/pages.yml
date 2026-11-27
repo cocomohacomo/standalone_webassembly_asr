@@ -145,8 +145,6 @@ jobs:
               "web/wasm/pcm-worklet.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
-              "web/wasm/dist/sherpa_embed_asr_wasm.js",
-              "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
           ]
           for name in required:
               path = root / name
