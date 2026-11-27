@@ -1,6 +1,8 @@
 // Dedicated Worker owns the WASM runtime, model filesystem and ASR engine.
 let runtime = null;
 let engineReady = false;
+let audioScratchPtr = 0;
+const AUDIO_SCRATCH_SAMPLES = 1600;
 const VOICEPRINT_DB = "vnn-voiceprints", VOICEPRINT_STORE = "profiles";
 function openVoiceprintDb(){return new Promise((resolve,reject)=>{const q=indexedDB.open(VOICEPRINT_DB,1);q.onupgradeneeded=()=>q.result.createObjectStore(VOICEPRINT_STORE);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}
 async function loadVoiceprintPack(){const db=await openVoiceprintDb();const value=await new Promise((resolve,reject)=>{const tx=db.transaction(VOICEPRINT_STORE,"readonly");const q=tx.objectStore(VOICEPRINT_STORE).get("sealed");q.onsuccess=()=>resolve(q.result||null);q.onerror=()=>reject(q.error)});db.close();return value}
@@ -185,6 +187,8 @@ self.onmessage = async ({ data }) => {
         const diarizationAvailable = !!runtime._wasm_asr_diarization_available();
         const voiceprintAvailable = !!runtime._wasm_asr_voiceprint_available();
         if (!diarizationAvailable || !voiceprintAvailable) throw new Error("Pinned ASR library reports speaker diarization/voiceprint unavailable");
+        audioScratchPtr = runtime._malloc(AUDIO_SCRATCH_SAMPLES * Float32Array.BYTES_PER_ELEMENT);
+        if (!audioScratchPtr) throw new Error("Unable to allocate reusable PCM input buffer");
         engineReady = true;
         self.postMessage({ type: "speaker-capabilities", diarization: diarizationAvailable, voiceprint: voiceprintAvailable });
         self.postMessage({ type: "speaker-profiles", profiles: jsonFrom(runtime._wasm_asr_voiceprint_profiles()) });
@@ -195,10 +199,10 @@ self.onmessage = async ({ data }) => {
         if (!engineReady) throw new Error("ASR engine is not initialized");
         const samples = data.samples instanceof Float32Array
           ? data.samples : new Float32Array(data.samples);
-        const ptr = runtime._malloc(samples.byteLength);
-        runtime.HEAPF32.set(samples, ptr >>> 2);
-        const rc = runtime._wasm_asr_push_pcm(ptr, samples.length);
-        runtime._free(ptr);
+        if (!samples.length) break;
+        if (samples.length > AUDIO_SCRATCH_SAMPLES) throw new Error("PCM chunk exceeds reusable input buffer capacity");
+        runtime.HEAPF32.set(samples, audioScratchPtr >>> 2);
+        const rc = runtime._wasm_asr_push_pcm(audioScratchPtr, samples.length);
         if (rc !== 0) throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));
         break;
       }
@@ -252,6 +256,8 @@ self.onmessage = async ({ data }) => {
       }
       case "close": {
         if (engineReady) runtime._wasm_asr_destroy();
+        if (audioScratchPtr && runtime) runtime._free(audioScratchPtr);
+        audioScratchPtr = 0;
         engineReady = false;
         self.postMessage({ type: "closed" });
         break;
