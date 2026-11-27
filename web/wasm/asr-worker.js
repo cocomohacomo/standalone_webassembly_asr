@@ -9,67 +9,112 @@ function cstr(value){return runtime.stringToNewUTF8(String(value??""))}
 function jsonFrom(ptr){return ptr?runtime.UTF8ToString(ptr):"[]"}
 async function persistVoiceprints(){const path=cstr("/data/voiceprints.oed");const rc=runtime._wasm_asr_voiceprint_save(path);runtime._free(path);if(rc<0)throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));await saveVoiceprintPack(runtime.FS.readFile("/data/voiceprints.oed"));}
 
-async function fetchModel(url, checksum, fallbackUrl) {
-  const candidates = [url, ...(fallbackUrl && fallbackUrl !== url ? [fallbackUrl] : [])];
+const MODEL_DB = "vnn-asr-model-cache";
+const MODEL_STORE = "models";
+const MODEL_CACHE_VERSION = "v1";
+function openModelDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(MODEL_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(MODEL_STORE)) db.createObjectStore(MODEL_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Model storage unavailable"));
+  });
+}
+async function readCachedModel(key) {
+  const db = await openModelDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(MODEL_STORE, "readonly");
+      const request = tx.objectStore(MODEL_STORE).get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } finally { db.close(); }
+}
+async function writeCachedModel(key, record) {
+  const db = await openModelDb();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(MODEL_STORE, "readwrite");
+      tx.objectStore(MODEL_STORE).put(record, key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error("Model cache write failed"));
+      tx.onabort = () => reject(tx.error || new Error("Model cache transaction aborted"));
+    });
+  } finally { db.close(); }
+}
+async function sha256Hex(bytes) {
+  if (!self.crypto?.subtle) throw new Error("SHA-256 verification unavailable");
+  const digest = await self.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
+}
+async function fetchModel(item) {
+  const cacheKey = MODEL_CACHE_VERSION + ":" + item.path;
+  const cached = await readCachedModel(cacheKey).catch(error => {
+    console.warn("Persistent model cache read failed:", error);
+    return null;
+  });
+  if (cached?.bytes) {
+    const bytes = cached.bytes instanceof ArrayBuffer ? cached.bytes : cached.bytes.buffer;
+    const actual = await sha256Hex(bytes);
+    if (actual === cached.sha256 && (!item.sha256 || actual === item.sha256.toLowerCase())) {
+      self.postMessage({ type: "model-cache-hit", path: item.path, bytes: bytes.byteLength });
+      return new Uint8Array(bytes);
+    }
+    console.warn("Discarding corrupted/stale local model:", item.path);
+  }
+  if (self.navigator && self.navigator.onLine === false) {
+    throw new Error("オフラインですが端末内にモデルがありません: " + item.path + "。オンライン時にモデル準備を完了してください。");
+  }
+  const candidates = [item.url, ...(item.fallbackUrl && item.fallbackUrl !== item.url ? [item.fallbackUrl] : [])];
   let lastError = null;
   for (const candidate of candidates) {
-    const request = new Request(candidate, { mode: "cors" });
-    let cache = null;
-    if (!checksum && "caches" in self) {
-      try {
-        cache = await caches.open("voice-memo-ja-model-v6");
-        const cached = await cache.match(request);
-        if (cached && cached.ok && (await cached.clone().arrayBuffer()).byteLength > 0) return cached;
-        if (cached) await cache.delete(request);
-      } catch (error) {
-        console.warn("Model cache unavailable; fetching without cache:", error);
-        cache = null;
-      }
-    }
     for (let attempt = 0; attempt < 3; attempt++) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
       try {
-        const response = await fetch(request, {
+        const response = await fetch(new Request(candidate, { mode: "cors" }), {
           signal: controller.signal,
-          cache: checksum ? "no-store" : "default"
+          cache: "no-store"
         });
         if (!response.ok) throw new Error("HTTP " + response.status);
-        const cacheCopy = response.clone();
         const bytes = await response.arrayBuffer();
-        if (bytes.byteLength === 0) throw new Error("Empty response");
-        if (checksum) {
-          if (!self.crypto?.subtle) throw new Error("SHA-256 verification unavailable");
-          const digest = await self.crypto.subtle.digest("SHA-256", bytes);
-          const actual = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
-          if (actual !== checksum.toLowerCase()) {
-            throw new Error("SHA-256 mismatch: expected " + checksum + ", got " + actual);
-          }
+        if (!bytes.byteLength) throw new Error("Empty response");
+        const actual = await sha256Hex(bytes);
+        if (item.sha256 && actual !== item.sha256.toLowerCase()) {
+          throw new Error("SHA-256 mismatch: expected " + item.sha256 + ", got " + actual);
         }
         clearTimeout(timeoutId);
-        // Only verified, unchecksummed assets may enter the model cache. Integrity-protected
-        // files always bypass CacheStorage and the browser HTTP cache.
-        if (cache && !checksum && (response.type === "cors" || response.type === "basic")) {
-          try { await cache.put(request, cacheCopy); }
-          catch (error) { console.warn("Model cache write skipped:", error); }
-        }
-        return new Response(bytes, { status: 200, headers: response.headers });
+        const record = {
+          bytes,
+          sha256: actual,
+          expectedSha256: item.sha256 || null,
+          modelVersion: MODEL_CACHE_VERSION,
+          savedAt: Date.now(),
+          size: bytes.byteLength
+        };
+        await writeCachedModel(cacheKey, record);
+        self.postMessage({ type: "model-cached", path: item.path, bytes: bytes.byteLength, sha256: actual });
+        return new Uint8Array(bytes);
       } catch (error) {
         clearTimeout(timeoutId);
         lastError = error;
         const reason = error?.name === "AbortError" ? "120s timeout" : String(error?.message || error);
         console.warn("Model fetch/integrity retry", attempt + 1, candidate, reason);
-        if (/HTTP 404|HTTP 403/.test(reason)) break;
+        if (/HTTP 404|HTTP 403|SHA-256 mismatch/.test(reason)) break;
         if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
-    console.warn("Model source unavailable or failed integrity; trying fallback:", candidate, lastError);
   }
-  throw new Error("Download/integrity verification failed for all model sources: " + candidates.join(" | ") + " (" + String(lastError?.message || lastError) + ")");
+  throw new Error("モデル取得・検証・端末保存に失敗: " + item.path + " (" + String(lastError?.message || lastError) + ")");
 }
 async function installModelFiles(files, modelRoot) {
   const root = modelRoot || "/models";
   runtime.FS.mkdirTree(root);
+  let completed = 0;
   for (const item of (files || [])) {
     if (!item || typeof item.url !== "string" || typeof item.path !== "string") throw new Error("Invalid model file descriptor");
     let relative = item.path;
@@ -79,15 +124,15 @@ async function installModelFiles(files, modelRoot) {
     const slash = target.lastIndexOf("/");
     if (slash > 0) runtime.FS.mkdirTree(target.slice(0, slash));
     try {
-      const response = await fetchModel(item.url, item.sha256, item.fallbackUrl);
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (!bytes.length) throw new Error("Downloaded file is empty");
+      const bytes = await fetchModel(item);
       runtime.FS.writeFile(target, bytes);
-      self.postMessage({ type: "model-file-ready", path: target });
+      completed++;
+      self.postMessage({ type: "model-file-ready", path: target, completed, total: files.length });
     } catch (error) {
-      throw new Error("Failed model " + item.path + " [" + item.url + "]: " + String(error?.message || error));
+      throw new Error("Failed model " + item.path + ": " + String(error?.message || error));
     }
   }
+  self.postMessage({ type: "models-ready", count: completed });
   return root;
 }
 self.onmessage = async ({ data }) => {
