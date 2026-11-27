@@ -44,6 +44,10 @@ jobs:
           test -s licenses/whisper-diarization-suite.NOTICE.txt
           test -s licenses/punct_ja_cv.NOTICE.txt
           test -s web/wasm/asr-worker.js
+          grep -q 'vnn-asr-model-cache' web/wasm/asr-worker.js
+          grep -q 'model-cache-hit' web/wasm/asr-worker.js
+          grep -q 'model-cached' web/wasm/asr-worker.js
+          grep -q 'sherpa_embed_asr_wasm.wasm' sw.js
           test -s web/wasm/pcm-worklet.js
           node --check app.js
           node --check sw.js
@@ -141,6 +145,8 @@ jobs:
               "web/wasm/pcm-worklet.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
+              "web/wasm/dist/sherpa_embed_asr_wasm.js",
+              "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
           ]
           for name in required:
               path = root / name
@@ -160,6 +166,8 @@ jobs:
           shell = (root / "sw.js").read_text(encoding="utf-8")
           assert '"./web/wasm/asr-worker.js"' in shell
           assert '"./web/wasm/pcm-worklet.js"' in shell
+          assert '"./web/wasm/dist/sherpa_embed_asr_wasm.js"' in shell
+          assert '"./web/wasm/dist/sherpa_embed_asr_wasm.wasm"' in shell
           assert "./web/wasm/asr-worker.js" in app
           assert "./web/wasm/pcm-worklet.js" in app
           assert "./web/wasm/dist/sherpa_embed_asr_wasm.js" in app
