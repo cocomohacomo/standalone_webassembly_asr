@@ -200,7 +200,6 @@ self.onmessage = async ({ data }) => {
         const rc = runtime._wasm_asr_push_pcm(ptr, samples.length);
         runtime._free(ptr);
         if (rc !== 0) throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));
-        self.postMessage({ type: "accepted", sampleCount: samples.length });
         break;
       }
       case "speaker-profiles": {
