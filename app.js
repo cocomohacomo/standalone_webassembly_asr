@@ -35,11 +35,11 @@ function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#
 function closeSettings(){$("#settingsPanel").classList.remove("open")}
 
 let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
-let transcriptSegments=[],internalTranscriptUpdate=false,settingsDirty=false;
+let transcriptSegments=[],internalTranscriptUpdate=false,settingsDirty=false;let transcriptLogicalLength=0;const transcriptQueue=[];let transcriptTypingTimer=0;
 function normalizeTranscriptText(value){
  return String(value??"").replace(/\\r\\n/g,"\n").replace(/\\n/g,"\n").replace(/\\r/g,"\n");
 }
-try{const storedTranscript=localStorage.getItem(TRANSCRIPT_KEY)||"";textArea.value=normalizeTranscriptText(storedTranscript);transcriptSegments=JSON.parse(localStorage.getItem("vnnTranscriptSegments")||"[]");if(textArea.value!==storedTranscript){transcriptSegments=[];localStorage.setItem("vnnTranscriptSegments","[]");localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}}catch{transcriptSegments=[]}
+try{const storedTranscript=localStorage.getItem(TRANSCRIPT_KEY)||"";textArea.value=normalizeTranscriptText(storedTranscript);transcriptSegments=JSON.parse(localStorage.getItem("vnnTranscriptSegments")||"[]");if(textArea.value!==storedTranscript){transcriptSegments=[];localStorage.setItem("vnnTranscriptSegments","[]");localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}}catch{transcriptSegments=[]}transcriptLogicalLength=textArea.value.length;fitTranscriptArea();
 async function restoreSavedAudio(){if(!settings.saveAudio)return;try{const blob=await loadAudioLocally();if(!blob)return;audioBlob=blob;cleanUrl();audioUrl=URL.createObjectURL(blob);audioEl.src=audioUrl;audioEl.load();$("#playbackRail").style.display="flex";$("#downloadAudioBtn").disabled=false;status("保存済みの録音を復元しました")}catch(error){console.warn("Saved audio restore failed",error)}}
 
 let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
@@ -56,7 +56,49 @@ const MODEL_FILES=[
  {url:"./models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",fallbackUrl:"https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/8be2a75c9ed7a590538b268e46fbb65e1aa9d208/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",path:"3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",sha256:"f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11"}
 ];
 function fmt(ms){const sec=Math.floor(ms/1000);return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0")}
-function status(s,active=false){statusText.textContent=s;dot.classList.toggle("active",active)}
+function status(s,active=false){
+ const track=statusText.querySelector(".status-track")||statusText;
+ track.textContent=String(s??"");
+ statusText.classList.remove("is-marquee");
+ track.style.animationDuration="";
+ requestAnimationFrame(()=>{
+  const overflow=track.scrollWidth>statusText.clientWidth+2;
+  if(overflow){
+   const label=String(s??"");
+   track.textContent=label+"　　　"+label;
+   const duration=Math.max(8,Math.min(30,label.length*0.42));
+   track.style.setProperty("--marquee-duration",duration+"s");
+   statusText.classList.add("is-marquee");
+  }
+ });
+ dot.classList.toggle("active",active);
+}
+function fitTranscriptArea(){
+ textArea.style.height="auto";
+ textArea.style.height=Math.max(textArea.scrollHeight,Math.ceil(parseFloat(getComputedStyle(textArea).lineHeight)*2))+"px";
+}
+function typeNextTranscriptCharacter(){
+ transcriptTypingTimer=0;
+ if(!transcriptQueue.length)return;
+ const job=transcriptQueue[0];
+ if(job.index<job.text.length){
+  textArea.value+=job.text.charAt(job.index++);
+  fitTranscriptArea();
+  textArea.scrollTop=textArea.scrollHeight;
+  transcriptTypingTimer=setTimeout(typeNextTranscriptCharacter,22);
+ }else{
+  transcriptQueue.shift();
+  persistTranscript();
+  if(transcriptQueue.length)transcriptTypingTimer=setTimeout(typeNextTranscriptCharacter,22);
+ }
+}
+function enqueueTranscriptText(value){
+ const content=String(value??"");
+ if(!content)return;
+ transcriptLogicalLength+=content.length;
+ transcriptQueue.push({text:content,index:0});
+ if(!transcriptTypingTimer)transcriptTypingTimer=setTimeout(typeNextTranscriptCharacter,22);
+}
 function setTimer(){timerEl.textContent=fmt(Date.now()-startedAt)}
 function cleanUrl(){if(audioUrl){URL.revokeObjectURL(audioUrl);audioUrl=null}}
 function workerMessage({data}){
@@ -79,7 +121,7 @@ function workerMessage({data}){
   if(event.type===9){const seg=transcriptSegments.find(x=>Math.abs(x.t0-Number(event.t0))<0.03&&Math.abs(x.t1-Number(event.t1))<0.03);if(seg){const label=settings.speakerDisplay?(event.speakerName?"["+event.speakerName+"] ":event.speaker?"["+event.speaker+"] ":""):"";const oldLength=seg.labelEnd-seg.labelStart;internalTranscriptUpdate=true;textArea.setRangeText(label,seg.labelStart,seg.labelEnd,"preserve");const delta=label.length-oldLength;seg.labelEnd=seg.labelStart+label.length;seg.start+=delta;seg.end+=delta;seg.speaker=event.speaker||"";seg.speakerName=event.speakerName||"";for(const item of transcriptSegments){if(item!==seg&&item.start>=seg.end-delta){item.start+=delta;item.end+=delta;item.labelStart+=delta;item.labelEnd+=delta}}internalTranscriptUpdate=false;persistTranscript()}return}
   if(event.type===8){status("複数話者の重なりを検出しました");return}
   if(event.text&&event.text.trim()){
-    if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const speakerId=String(event.speaker??"").trim();const speakerName=event.speakerStatus==="identified"?String(event.speakerName||""):"";const speakerLabel=settings.speakerDisplay?(speakerName?"["+speakerName+"] ":speakerId?"["+speakerId+"] ":""):"";const recognizedText=normalizeTranscriptText(event.text).trim();const prefix=textArea.value?"\n":"";const labelStart=textArea.value.length+prefix.length+stamp.length;const start=labelStart+speakerLabel.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+speakerLabel+recognizedText;transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+recognizedText.length,labelStart,labelEnd:start,speaker:speakerId,speakerName});internalTranscriptUpdate=false;persistTranscript()}
+    if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const speakerId=String(event.speaker??"").trim();const speakerName=event.speakerStatus==="identified"?String(event.speakerName||""):"";const speakerLabel=settings.speakerDisplay?(speakerName?"["+speakerName+"] ":speakerId?"["+speakerId+"] ":""):"";const recognizedText=normalizeTranscriptText(event.text).trim();const prefix=transcriptLogicalLength?"\n":"";const labelStart=transcriptLogicalLength+prefix.length+stamp.length;const start=labelStart+speakerLabel.length;enqueueTranscriptText(prefix+stamp+speakerLabel+recognizedText);transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+recognizedText.length,labelStart,labelEnd:start,speaker:speakerId,speakerName})}
    else if(event.type===1){status("認識中… "+event.text.trim(),true)}
   }
   return;
@@ -164,7 +206,7 @@ $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const 
 $("#exportBtn").addEventListener("click",()=>{const blob=new Blob([textArea.value],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="transcription.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
 function loadHistory(){let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};historyEl.innerHTML="";if(!list.length){historyEl.innerHTML='<p class="hint">保存した履歴はここに表示されます。</p>';return}list.slice(0,30).forEach(item=>{const row=document.createElement("div");row.className="history-item";const label=document.createElement("span");label.textContent=item.date;const open=document.createElement("button");open.textContent="開く";open.onclick=()=>textArea.value=item.text;row.append(label,open);historyEl.append(row)})}
 $("#saveBtn").addEventListener("click",()=>{const value=textArea.value.trim();if(!value){status("保存するテキストがありません");return}let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};list.unshift({date:new Date().toLocaleString("ja-JP"),text:value});localStorage.setItem("voiceMemoHistory",JSON.stringify(list.slice(0,30)));loadHistory();status("履歴に保存しました")});
-$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;transcriptSegments=[];textArea.value="";persistTranscript();localStorage.removeItem("vnnTranscriptSegments");audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();clearAudioLocally();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";status("待機中")});
+$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;if(transcriptTypingTimer)clearTimeout(transcriptTypingTimer);transcriptTypingTimer=0;transcriptQueue.length=0;transcriptLogicalLength=0;transcriptSegments=[];textArea.value="";fitTranscriptArea();persistTranscript();localStorage.removeItem("vnnTranscriptSegments");audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();clearAudioLocally();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";status("待機中")});
 loadHistory();
 restoreSavedAudio();
 $("#connection").textContent=navigator.onLine?"オンライン":"オフライン";
@@ -200,7 +242,7 @@ audioEl.addEventListener("timeupdate",()=>{updatePlaybackCursor();syncTranscript
 audioEl.addEventListener("play",()=>{$("#playToggle").textContent="Ⅱ";if(!playbackFrame)playbackFrame=requestAnimationFrame(animatePlaybackCursor)});
 audioEl.addEventListener("pause",()=>{$("#playToggle").textContent="▶";if(playbackFrame)cancelAnimationFrame(playbackFrame);playbackFrame=0;updatePlaybackCursor()});
 audioEl.addEventListener("ended",()=>{$("#playToggle").textContent="▶";if(playbackFrame)cancelAnimationFrame(playbackFrame);playbackFrame=0;updatePlaybackCursor();textArea.setSelectionRange(0,0)});
-textArea.addEventListener("input",()=>{if(!internalTranscriptUpdate){transcriptSegments=[];localStorage.removeItem("vnnTranscriptSegments")}persistTranscript()});
+textArea.addEventListener("input",()=>{if(!internalTranscriptUpdate){if(transcriptTypingTimer)clearTimeout(transcriptTypingTimer);transcriptTypingTimer=0;transcriptQueue.length=0;transcriptLogicalLength=textArea.value.length;transcriptSegments=[];localStorage.removeItem("vnnTranscriptSegments")}fitTranscriptArea();persistTranscript()});
 $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
 $("#dictionaryInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("#dictionaryAdd").click()});
 function renderSpeakerProfiles(){const root=$("#speakerList");if(!root)return;root.innerHTML="";const select=$("#speakerAssignSelect");if(select){select.innerHTML="";const first=document.createElement("option");first.value="";first.textContent="割当先を選択";select.append(first)}speakerProfiles.forEach(p=>{const row=document.createElement("div"),label=document.createElement("span"),rename=document.createElement("button"),remove=document.createElement("button");row.className="list-item";label.textContent=p.name+" ("+p.id+") · "+p.samples+" サンプル";if(select){const option=document.createElement("option");option.value=p.id;option.textContent=p.name+" ("+p.id+")";select.append(option)}rename.textContent="名称変更";rename.onclick=()=>{const n=prompt("新しい話者名",p.name);if(n&&n.trim())asrWorker?.postMessage({type:"speaker-rename",id:p.id,name:n.trim()})};remove.textContent="削除";remove.onclick=()=>{if(confirm(p.name+" の声紋を削除しますか？"))asrWorker?.postMessage({type:"speaker-delete",id:p.id})};row.append(label,rename,remove);root.append(row)})}
