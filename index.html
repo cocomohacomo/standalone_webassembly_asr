@@ -8,19 +8,20 @@
 <style>
 :root{color-scheme:light;--ink:#161616;--muted:#777;--line:#e7e7e7;--accent:#111}
 *{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Noto Sans JP",sans-serif}
-main{position:relative;max-width:800px;margin:auto;padding:calc(64px + env(safe-area-inset-top)) 12px calc(94px + env(safe-area-inset-bottom))}
-header{position:fixed;top:0;left:0;right:0;z-index:15;height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) max(14px,calc((100vw - 776px)/2)) 0;display:flex;align-items:center;gap:10px;background:#fff;border-bottom:1px solid var(--line);font-size:16px;font-weight:650}.header-title{flex:0 0 auto;white-space:nowrap}.header-status{display:block;flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;font-size:12px;font-weight:500;color:var(--muted);line-height:1.4}.status-track{display:inline-block;white-space:nowrap}.header-status.is-marquee .status-track{animation:status-marquee var(--marquee-duration,12s) linear infinite}@keyframes status-marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.header-actions{display:flex;align-items:center;gap:8px}
+main{position:relative;max-width:800px;margin:auto;padding:calc(72px + env(safe-area-inset-top)) 12px calc(94px + env(safe-area-inset-bottom))}
+header{position:fixed;top:0;left:0;right:0;z-index:15;height:calc(66px + env(safe-area-inset-top));padding:env(safe-area-inset-top) max(14px,calc((100vw - 776px)/2)) 0;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-bottom:1px solid var(--line);font-size:16px;font-weight:650}.header-brand{display:flex;flex:1 1 auto;flex-direction:column;justify-content:center;min-width:0;gap:1px;overflow:hidden}.header-title{display:block;flex:0 0 auto;white-space:nowrap;line-height:1.25}.header-status{display:block;flex:0 0 17px;width:100%;min-width:0;max-width:100%;overflow:hidden;white-space:nowrap;font-size:12px;font-weight:500;color:var(--muted);line-height:17px}.status-track{display:inline-block;white-space:nowrap}.header-status.is-marquee .status-track{animation:status-marquee var(--marquee-duration,12s) linear infinite}@keyframes status-marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.header-actions{display:flex;flex:0 0 auto;align-items:center;gap:4px}
 .header-actions button{display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:50%;background:transparent;color:#111}
 .header-actions button:active{background:#f2f2f2}
 #appVersion{font-size:12px;color:#777;font-weight:500;margin-left:3px}
 .status{display:none}#statusText{font-size:12px;color:var(--muted)}
-.transcript{display:flex;gap:5px;align-items:stretch}
-#playbackRail{width:22px;flex:0 0 22px;display:none;align-self:stretch;align-items:stretch;justify-content:center;padding:14px 0;min-height:220px;height:auto}
-#playRail{position:relative;display:block;width:2px;min-height:220px;height:100%;flex:1 0 2px;background:#e8e8e8;border-radius:2px;overflow:visible;margin:0 auto;touch-action:none;cursor:ns-resize;outline:none}
-#playProgress{position:absolute;inset:0 0 auto;width:2px;height:0;background:#171717;border-radius:2px;pointer-events:none}
-#playToggle{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:2;display:grid;place-items:center;width:15px;height:15px;padding:0;border:2px solid #fff;border-radius:50%;background:#171717;color:transparent;font-size:0;line-height:1;box-shadow:0 0 0 1px #17171755,0 1px 3px #0002;touch-action:manipulation;cursor:grab}
-#playToggle:active{cursor:grabbing;transform:translate(-50%,-50%) scale(1.12)}
+.transcript{display:flex;gap:5px;align-items:flex-start}
+#playbackRail{width:40px;flex:0 0 40px;display:none;align-self:stretch;align-items:stretch;justify-content:center;padding:12px 2px;min-height:244px;height:auto}
+#playRail{position:relative;display:block;width:36px;min-height:220px;height:auto;flex:0 0 36px;background:transparent;border-radius:2px;overflow:visible;margin:0 auto;touch-action:none;cursor:ns-resize;outline:none}
+#playRail::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:2px;transform:translateX(-50%);background:#e8e8e8;border-radius:2px;pointer-events:none}
+#playProgress{position:absolute;left:calc(50% - 1px);top:0;width:2px;height:0;background:#171717;border-radius:2px;pointer-events:none}
+#playToggle{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:2;display:grid;place-items:center;width:22px;height:22px;padding:0;border:2px solid #fff;border-radius:50%;background:#171717;color:#fff;font-size:9px;font-weight:700;line-height:1;box-shadow:0 0 0 1px #17171755,0 1px 3px #0002;touch-action:none;cursor:grab}
+#playToggle:active{cursor:grabbing;transform:translate(-50%,-50%) scale(1.08)}
 #playRail:focus-visible #playToggle{box-shadow:0 0 0 4px #1112,0 0 0 1px #111}
 #text{display:block;width:100%;height:auto;min-height:3.6em;max-height:none;overflow:hidden;resize:none;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;line-height:1.8;padding:2px 0 32px;white-space:pre-wrap;overflow-wrap:anywhere}
 #text::placeholder{color:#aaa}
@@ -47,15 +48,15 @@ button:disabled{opacity:.4}
 @media(min-width:700px){main{padding-left:24px;padding-right:24px}}
 </style></head>
 <body><main>
-<header><span class="header-title">文字起こしアプリ v<span id="appVersion">…</span></span><span id="statusText" class="header-status" aria-live="polite"><span class="status-track">録音待機中</span></span><div class="header-actions"><button id="shareBtn" type="button" aria-label="共有" title="共有"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/></svg></button><button id="settingsBtn" type="button" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 2.8h4.6l.5 2.1a7.5 7.5 0 0 1 1.7 1l2-.7 2.3 4-1.6 1.4a7.7 7.7 0 0 1 0 2l1.6 1.4-2.3 4-2-.7a7.5 7.5 0 0 1-1.7 1l-.5 2.1H9.7l-.5-2.1a7.5 7.5 0 0 1-1.7-1l-2 .7-2.3-4 1.6-1.4a7.7 7.7 0 0 1 0-2L3.2 9.2l2.3-4 2 .7a7.5 7.5 0 0 1 1.7-1l.5-2.1Z"/><circle cx="12" cy="12" r="3.1"/></svg></button></div></header>
+<header><div class="header-brand"><span class="header-title">文字起こしアプリ v<span id="appVersion">…</span></span><span id="statusText" class="header-status" aria-live="polite"><span class="status-track">録音待機中</span></span></div><div class="header-actions"><button id="shareBtn" type="button" aria-label="共有" title="共有"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/></svg></button><button id="settingsBtn" type="button" aria-label="設定" title="設定"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 2.8h4.6l.5 2.1a7.5 7.5 0 0 1 1.7 1l2-.7 2.3 4-1.6 1.4a7.7 7.7 0 0 1 0 2l1.6 1.4-2.3 4-2-.7a7.5 7.5 0 0 1-1.7 1l-.5 2.1H9.7l-.5-2.1a7.5 7.5 0 0 1-1.7-1l-2 .7-2.3-4 1.6-1.4a7.7 7.7 0 0 1 0-2L3.2 9.2l2.3-4 2 .7a7.5 7.5 0 0 1 1.7-1l.5-2.1Z"/><circle cx="12" cy="12" r="3.1"/></svg></button></div></header>
 <div class="status"><span class="dot" id="recordDot"></span></div><div class="timer" id="timer">00:00</div>
 <div class="controls"><button class="btn" id="stopBtn" disabled>停止</button></div>
 <p class="hint" id="audioHint">録音音声はこの端末内で処理します。</p>
 <div id="transcriptionNotice" class="notice">日本語音声認識モデルを初期化します。</div><div id="speechNotice" class="notice hide"></div>
-<div class="transcript"><div id="playbackRail"><div id="playRail" role="slider" aria-label="再生位置" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0"><div id="playProgress"></div><button id="playToggle" type="button" aria-label="再生・一時停止">▶</button></div></div><textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea></div>
+<div class="transcript"><div id="playbackRail"><div id="playRail" role="group" aria-label="再生位置" tabindex="0"><div id="playProgress"></div><button id="playToggle" type="button" aria-label="再生・一時停止">▶</button></div></div><textarea id="text" placeholder="文字起こし結果…" aria-label="文字起こしテキスト"></textarea></div>
 <div class="legacy-actions"><button class="btn" id="exportBtn">TXT保存</button><button class="btn" id="saveBtn">履歴保存</button></div>
 <div class="card" id="history-card"><div id="history"></div></div>
-<audio id="audio" controls class="hide" style="width:100%"></audio><button id="downloadAudioBtn" disabled>録音を保存</button><button id="clearBtn">クリア</button><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span id="connection">準備中</span>
+<audio id="audio" controls preload="metadata" class="hide" style="width:100%"></audio><button id="downloadAudioBtn" disabled>録音を保存</button><button id="clearBtn">クリア</button><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span id="connection">準備中</span>
 </main>
 <div class="bottom-bar" aria-label="録音操作"><button id="recordBtn" type="button" aria-label="録音開始">●</button></div>
 <div id="settingsPanel" role="dialog" aria-modal="true" aria-label="設定">
