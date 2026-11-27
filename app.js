@@ -54,7 +54,7 @@ function normalizeTranscriptText(value){
  return text.replace(/\r\n?/g,"\n");
 }
 try{const storedTranscript=localStorage.getItem(TRANSCRIPT_KEY)||"";textArea.value=normalizeTranscriptText(storedTranscript);transcriptSegments=JSON.parse(localStorage.getItem("vnnTranscriptSegments")||"[]");if(textArea.value!==storedTranscript){transcriptSegments=[];localStorage.setItem("vnnTranscriptSegments","[]");localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}}catch{transcriptSegments=[]}transcriptLogicalLength=textArea.value.length;fitTranscriptArea();
-async function restoreSavedAudio(){if(!settings.saveAudio)return;try{const blob=await loadAudioLocally();if(!blob)return;audioBlob=blob;cleanUrl();audioUrl=URL.createObjectURL(blob);audioEl.src=audioUrl;audioEl.load();$("#playbackRail").style.display="flex";$("#downloadAudioBtn").disabled=false;status("保存済みの録音を復元しました")}catch(error){console.warn("Saved audio restore failed",error)}}
+async function restoreSavedAudio(){if(!settings.saveAudio)return;try{const blob=await loadAudioLocally();if(!blob)return;audioBlob=blob;cleanUrl();audioUrl=URL.createObjectURL(blob);audioEl.src=audioUrl;audioEl.load();$("#playbackRail").style.display="flex";$(".transcript").classList.add("has-playback");$("#downloadAudioBtn").disabled=false;status("保存済みの録音を復元しました")}catch(error){console.warn("Saved audio restore failed",error)}}
 
 let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
 let enrollmentChunks=[],enrollmentSamples=0,speakerProfiles=[];const ENROLLMENT_MAX_SAMPLES=16000*10;
@@ -208,7 +208,7 @@ recordBtn.addEventListener("click",async()=>{
   await startLivePcm(mediaStream);
   chunks=[];enrollmentChunks=[];enrollmentSamples=0;audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
   recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
-  recorder.onstop=async()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){try{await saveAudioLocally(audioBlob)}catch(error){console.warn("Audio persistence failed",error);status("録音音声を端末に保存できませんでした")}audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.currentTime=0;audioEl.load();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex"}else{await clearAudioLocally();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none"}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false};
+  recorder.onstop=async()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){try{await saveAudioLocally(audioBlob)}catch(error){console.warn("Audio persistence failed",error);status("録音音声を端末に保存できませんでした")}audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.currentTime=0;audioEl.load();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex";$(".transcript").classList.add("has-playback")}else{await clearAudioLocally();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none";$(".transcript").classList.remove("has-playback")}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false};
   recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,1000);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
  }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.textContent="開始";recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
 });
@@ -220,7 +220,7 @@ $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const 
 $("#exportBtn").addEventListener("click",()=>{const blob=new Blob([textArea.value],{type:"text/plain;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="transcription.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
 function loadHistory(){let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};historyEl.innerHTML="";if(!list.length){historyEl.innerHTML='<p class="hint">保存した履歴はここに表示されます。</p>';return}list.slice(0,30).forEach(item=>{const row=document.createElement("div");row.className="history-item";const label=document.createElement("span");label.textContent=item.date;const open=document.createElement("button");open.textContent="開く";open.onclick=()=>{const value=normalizeTranscriptText(item.text);if(transcriptTypingTimer)clearTimeout(transcriptTypingTimer);transcriptTypingTimer=0;transcriptQueue.length=0;transcriptSegments=[];transcriptLogicalLength=value.length;textArea.value=value;fitTranscriptArea();persistTranscript()};row.append(label,open);historyEl.append(row)})}
 $("#saveBtn").addEventListener("click",()=>{const value=textArea.value.trim();if(!value){status("保存するテキストがありません");return}let list=[];try{list=JSON.parse(localStorage.getItem("voiceMemoHistory")||"[]")}catch{};list.unshift({date:new Date().toLocaleString("ja-JP"),text:value});localStorage.setItem("voiceMemoHistory",JSON.stringify(list.slice(0,30)));loadHistory();status("履歴に保存しました")});
-$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;if(transcriptTypingTimer)clearTimeout(transcriptTypingTimer);transcriptTypingTimer=0;transcriptQueue.length=0;transcriptLogicalLength=0;transcriptSegments=[];textArea.value="";fitTranscriptArea();persistTranscript();localStorage.removeItem("vnnTranscriptSegments");audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();clearAudioLocally();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";status("待機中")});
+$("#clearBtn").addEventListener("click",()=>{if(!confirm("文字起こしテキストと録音データをクリアしますか？"))return;if(transcriptTypingTimer)clearTimeout(transcriptTypingTimer);transcriptTypingTimer=0;transcriptQueue.length=0;transcriptLogicalLength=0;transcriptSegments=[];textArea.value="";fitTranscriptArea();persistTranscript();localStorage.removeItem("vnnTranscriptSegments");audioEl.pause();audioEl.classList.add("hide");audioBlob=null;cleanUrl();clearAudioLocally();$("#downloadAudioBtn").disabled=true;timerEl.textContent="00:00";$("#playbackRail").style.display="none";$(".transcript").classList.remove("has-playback");status("待機中")});
 loadHistory();
 restoreSavedAudio();
 $("#connection").textContent=navigator.onLine?"オンライン":"オフライン";
@@ -235,26 +235,22 @@ $("#saveAudioSetting").addEventListener("change",e=>{settings.saveAudio=e.target
 $("#timestampSetting").addEventListener("change",e=>{settings.timestamps=e.target.checked;persistSettings()});
 $("#speakerDisplaySetting").addEventListener("change",e=>{settings.speakerDisplay=e.target.checked;persistSettings()});
 ["vadSensitivity","minSilence","maxPaths"].forEach(id=>$("#"+id).addEventListener("change",e=>{settings[id]=e.target.value;settingsDirty=true;persistSettings();status("認識パラメータは次回の録音開始時にエンジンを再初期化して適用します")}));
-function seekFromPointer(event){
+function seekFromPointerY(clientY){
  const rail=$("#playRail"),duration=Number(audioEl.duration);
  if(!audioBlob){status("再生できる録音音声がありません");return false}
  if(!Number.isFinite(duration)||duration<=0){status("録音音声を読み込み中です…",true);return false}
  const rect=rail.getBoundingClientRect();
  if(rect.height<=0)return false;
- const ratio=Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height));
- audioEl.currentTime=ratio*duration;
- updatePlaybackCursor();
- syncTranscriptToPlayback();
- return true;
+ const ratio=Math.max(0,Math.min(1,(clientY-rect.top)/rect.height));
+ try{audioEl.currentTime=ratio*duration}catch(error){console.warn("Audio seek failed",error);return false}
+ updatePlaybackCursor();syncTranscriptToPlayback();return true;
 }
 function updatePlaybackCursor(){
  const duration=Number(audioEl.duration);
  const ratio=Number.isFinite(duration)&&duration>0?Math.max(0,Math.min(1,audioEl.currentTime/duration)):0;
  const percent=ratio*100,toggle=$("#playToggle"),rail=$("#playRail");
- toggle.style.top=percent+"%";
- toggle.style.transform="translate(-50%,-50%)";
- toggle.textContent=audioEl.paused?"▶":"Ⅱ";
- toggle.setAttribute("aria-label",audioEl.paused?"再生":"一時停止");
+ toggle.style.top=percent+"%";toggle.style.transform="translate(-50%,-50%)";
+ toggle.textContent=audioEl.paused?"▶":"Ⅱ";toggle.setAttribute("aria-label",audioEl.paused?"再生":"一時停止");
  $("#playProgress").style.height=percent+"%";
  rail.setAttribute("aria-valuenow",String(Math.round(percent)));
  rail.setAttribute("aria-valuetext",fmt(audioEl.currentTime*1000)+" / "+fmt((Number.isFinite(duration)?duration:0)*1000));
@@ -263,38 +259,40 @@ let playbackFrame=0;
 function animatePlaybackCursor(){updatePlaybackCursor();if(!audioEl.paused&&!audioEl.ended)playbackFrame=requestAnimationFrame(animatePlaybackCursor);else playbackFrame=0}
 function syncTranscriptToPlayback(){
  if(document.activeElement===textArea)return;
- const time=audioEl.currentTime;
- const segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);
+ const time=audioEl.currentTime,segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);
  if(!segment)return;
  try{textArea.setSelectionRange(segment.start,segment.end)}catch{}
 }
 async function togglePlayback(){
  if(!audioBlob){status("再生できる録音音声がありません");return}
- if(audioEl.paused){
-  try{await audioEl.play()}
-  catch(error){status("音声を再生できません: "+(error.message||"再生エラー"));console.error("Audio playback failed",error)}
- }else audioEl.pause();
+ if(audioEl.paused){try{await audioEl.play()}catch(error){status("音声を再生できません: "+(error.message||"再生エラー"));console.error("Audio playback failed",error)}}
+ else audioEl.pause();
 }
-let railDragging=false,railPointerId=null,handlePointerId=null,handleStartY=0,handleDragged=false,suppressToggleClick=false;
 const playbackRail=$("#playRail"),playToggle=$("#playToggle");
-playToggle.addEventListener("pointerdown",event=>{
- event.stopPropagation();
+let railPointerId=null,railPointerStartY=0,railPointerMoved=false,railPointerOnHandle=false;
+playbackRail.addEventListener("pointerdown",event=>{
  if(event.pointerType==="mouse"&&event.button!==0)return;
- handlePointerId=event.pointerId;handleStartY=event.clientY;handleDragged=false;
- try{playToggle.setPointerCapture(event.pointerId)}catch{}
+ if(!audioBlob)return;
+ railPointerId=event.pointerId;railPointerStartY=event.clientY;railPointerMoved=false;
+ railPointerOnHandle=event.target===playToggle||playToggle.contains(event.target);
+ try{playbackRail.setPointerCapture(event.pointerId)}catch{}
+ event.preventDefault();seekFromPointerY(event.clientY);
 });
-playToggle.addEventListener("pointermove",event=>{
- if(handlePointerId!==event.pointerId)return;
- if(!handleDragged&&Math.abs(event.clientY-handleStartY)>=4)handleDragged=true;
- if(handleDragged)seekFromPointer(event);
+playbackRail.addEventListener("pointermove",event=>{
+ if(railPointerId!==event.pointerId)return;
+ if(Math.abs(event.clientY-railPointerStartY)>=3)railPointerMoved=true;
+ seekFromPointerY(event.clientY);
 });
-playToggle.addEventListener("pointerup",event=>{
- if(handlePointerId!==event.pointerId)return;
- if(handleDragged)suppressToggleClick=true;
- handlePointerId=null;handleDragged=false;
-});
-playToggle.addEventListener("pointercancel",()=>{handlePointerId=null;handleDragged=false});
-playToggle.addEventListener("click",()=>{if(suppressToggleClick){suppressToggleClick=false;return}togglePlayback()});
+function finishRailPointer(event){
+ if(railPointerId!==event.pointerId)return;
+ const shouldToggle=railPointerOnHandle&&!railPointerMoved;
+ railPointerId=null;railPointerOnHandle=false;
+ if(shouldToggle)togglePlayback();
+}
+playbackRail.addEventListener("pointerup",finishRailPointer);
+playbackRail.addEventListener("pointercancel",event=>{if(railPointerId===event.pointerId){railPointerId=null;railPointerOnHandle=false}});
+playbackRail.addEventListener("lostpointercapture",()=>{railPointerId=null;railPointerOnHandle=false});
+playToggle.addEventListener("click",event=>{event.preventDefault();if(event.detail===0)togglePlayback()});
 playbackRail.addEventListener("keydown",event=>{
  if(!audioBlob||!Number.isFinite(audioEl.duration))return;
  let next=audioEl.currentTime;
@@ -305,16 +303,6 @@ playbackRail.addEventListener("keydown",event=>{
  else return;
  event.preventDefault();audioEl.currentTime=Math.max(0,Math.min(audioEl.duration,next));updatePlaybackCursor();syncTranscriptToPlayback();
 });
-playbackRail.addEventListener("pointerdown",event=>{
- if(event.target===playToggle||(event.pointerType==="mouse"&&event.button!==0))return;
- railDragging=true;railPointerId=event.pointerId;
- try{playbackRail.setPointerCapture(event.pointerId)}catch{}
- event.preventDefault();seekFromPointer(event);
-});
-playbackRail.addEventListener("pointermove",event=>{if(railDragging&&railPointerId===event.pointerId)seekFromPointer(event)});
-playbackRail.addEventListener("pointerup",event=>{if(railPointerId===event.pointerId){railDragging=false;railPointerId=null}});
-playbackRail.addEventListener("pointercancel",()=>{railDragging=false;railPointerId=null});
-playbackRail.addEventListener("lostpointercapture",()=>{railDragging=false;railPointerId=null});
 audioEl.addEventListener("loadedmetadata",()=>{audioEl.currentTime=0;updatePlaybackCursor()});
 audioEl.addEventListener("durationchange",updatePlaybackCursor);
 audioEl.addEventListener("seeking",updatePlaybackCursor);
