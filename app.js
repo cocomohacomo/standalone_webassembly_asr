@@ -242,7 +242,9 @@ function seekFromPointerY(clientY){
  const rect=rail.getBoundingClientRect();
  if(rect.height<=0)return false;
  const ratio=Math.max(0,Math.min(1,(clientY-rect.top)/rect.height));
- try{audioEl.currentTime=ratio*duration}catch(error){console.warn("Audio seek failed",error);return false}
+ const targetTime=ratio*duration;
+ if(!Number.isFinite(targetTime))return false;
+ try{audioEl.currentTime=targetTime}catch(error){console.warn("Audio seek failed",error);return false}
  updatePlaybackCursor();syncTranscriptToPlayback();return true;
 }
 function updatePlaybackCursor(){
@@ -275,7 +277,7 @@ playbackRail.addEventListener("pointerdown",event=>{
  if(!audioBlob)return;
  railPointerId=event.pointerId;railPointerStartY=event.clientY;railPointerMoved=false;
  railPointerOnHandle=event.target===playToggle||playToggle.contains(event.target);
- try{playbackRail.setPointerCapture(event.pointerId)}catch{}
+ try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){console.warn("Seek pointer capture unavailable",error)}
  event.preventDefault();seekFromPointerY(event.clientY);
 });
 playbackRail.addEventListener("pointermove",event=>{
