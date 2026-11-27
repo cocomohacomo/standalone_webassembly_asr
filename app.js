@@ -15,7 +15,6 @@ function flushTranscriptPersistence(){
   localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments));
  }catch(error){console.warn("Transcript persistence failed",error)}
 }
-}
 function persistTranscript(){
  if(transcriptPersistTimer)clearTimeout(transcriptPersistTimer);
  transcriptPersistTimer=setTimeout(flushTranscriptPersistence,350);
@@ -53,7 +52,6 @@ function normalizeTranscriptText(value){
   text=normalized;
  }
  return text.replace(/\r\n?/g,"\n");
-}
 }
 try{const storedTranscript=localStorage.getItem(TRANSCRIPT_KEY)||"";textArea.value=normalizeTranscriptText(storedTranscript);transcriptSegments=JSON.parse(localStorage.getItem("vnnTranscriptSegments")||"[]");if(textArea.value!==storedTranscript){transcriptSegments=[];localStorage.setItem("vnnTranscriptSegments","[]");localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}}catch{transcriptSegments=[]}transcriptLogicalLength=textArea.value.length;fitTranscriptArea();
 async function restoreSavedAudio(){if(!settings.saveAudio)return;try{const blob=await loadAudioLocally();if(!blob)return;audioBlob=blob;cleanUrl();audioUrl=URL.createObjectURL(blob);audioEl.src=audioUrl;audioEl.load();$("#playbackRail").style.display="flex";$("#downloadAudioBtn").disabled=false;status("保存済みの録音を復元しました")}catch(error){console.warn("Saved audio restore failed",error)}}
