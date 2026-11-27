@@ -6,16 +6,18 @@ async function saveAudioLocally(blob){if(!blob)return;const db=await openLocalDb
 async function loadAudioLocally(){const db=await openLocalDb();const blob=await new Promise((resolve,reject)=>{const tx=db.transaction(AUDIO_STORE,"readonly");const req=tx.objectStore(AUDIO_STORE).get("latest");req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return blob}
 async function clearAudioLocally(){try{const db=await openLocalDb();await new Promise((resolve,reject)=>{const tx=db.transaction(AUDIO_STORE,"readwrite");tx.objectStore(AUDIO_STORE).delete("latest");tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch(error){console.warn("Local audio cleanup failed",error)}}
 let transcriptPersistTimer=0;
+function flushTranscriptPersistence(){
+ if(transcriptPersistTimer){clearTimeout(transcriptPersistTimer);transcriptPersistTimer=0}
+ try{
+  localStorage.setItem(TRANSCRIPT_KEY,textArea.value);
+  localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments));
+ }catch(error){console.warn("Transcript persistence failed",error)}
+}
 function persistTranscript(){
  if(transcriptPersistTimer)clearTimeout(transcriptPersistTimer);
- transcriptPersistTimer=setTimeout(()=>{
-  transcriptPersistTimer=0;
-  try{
-   localStorage.setItem(TRANSCRIPT_KEY,textArea.value);
-   localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments));
-  }catch(error){console.warn("Transcript persistence failed",error)}
- },350);
+ transcriptPersistTimer=setTimeout(flushTranscriptPersistence,350);
 }
+addEventListener("pagehide",flushTranscriptPersistence);
 
 const recordBtn=$("#recordBtn"),stopBtn=$("#stopBtn"),timerEl=$("#timer"),statusText=$("#statusText"),dot=$("#recordDot"),textArea=$("#text"),audioEl=$("#audio"),historyEl=$("#history");
 const installBtn=$("#installBtn");
@@ -71,7 +73,7 @@ function workerMessage({data}){
  if(data.type==="ready"){asrReady=true;asrWorker?.postMessage({type:"speaker-profiles"});status("日本語音声認識・話者識別の準備完了");return}
  if(data.type==="asr-event"){
   const event=data.event||{};
-  if(event.type===9){const seg=transcriptSegments.find(x=>Math.abs(x.t0-Number(event.t0))<0.03&&Math.abs(x.t1-Number(event.t1))<0.03);if(seg){const label=settings.speakerDisplay?(event.speakerName?"["+event.speakerName+"] ":event.speaker?"["+event.speaker+"] ":""):"";const oldLength=seg.labelEnd-seg.labelStart;internalTranscriptUpdate=true;textArea.setRangeText(label,seg.labelStart,seg.labelEnd,"preserve");const delta=label.length-oldLength;seg.labelEnd=seg.labelStart+label.length;seg.start+=delta;seg.end+=delta;seg.speaker=event.speaker||"";seg.speakerName=event.speakerName||"";for(const item of transcriptSegments){if(item!==seg&&item.start>=seg.end-delta){item.start+=delta;item.end+=delta;item.labelStart+=delta;item.labelEnd+=delta}}internalTranscriptUpdate=false;persistTranscript();try{localStorage.setItem("vnnTranscriptSegments",JSON.stringify(transcriptSegments))}catch{}}return}
+  if(event.type===9){const seg=transcriptSegments.find(x=>Math.abs(x.t0-Number(event.t0))<0.03&&Math.abs(x.t1-Number(event.t1))<0.03);if(seg){const label=settings.speakerDisplay?(event.speakerName?"["+event.speakerName+"] ":event.speaker?"["+event.speaker+"] ":""):"";const oldLength=seg.labelEnd-seg.labelStart;internalTranscriptUpdate=true;textArea.setRangeText(label,seg.labelStart,seg.labelEnd,"preserve");const delta=label.length-oldLength;seg.labelEnd=seg.labelStart+label.length;seg.start+=delta;seg.end+=delta;seg.speaker=event.speaker||"";seg.speakerName=event.speakerName||"";for(const item of transcriptSegments){if(item!==seg&&item.start>=seg.end-delta){item.start+=delta;item.end+=delta;item.labelStart+=delta;item.labelEnd+=delta}}internalTranscriptUpdate=false;persistTranscript()}return}
   if(event.type===8){status("複数話者の重なりを検出しました");return}
   if(event.text&&event.text.trim()){
     if(event.type===2){const stamp=settings.timestamps?"["+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"})+"] ":"";const speakerId=String(event.speaker??"").trim();const speakerName=event.speakerStatus==="identified"?String(event.speakerName||""):"";const speakerLabel=settings.speakerDisplay?(speakerName?"["+speakerName+"] ":speakerId?"["+speakerId+"] ":""):"";const recognizedText=String(event.text).replace(/\\\\r\\\\n/g,"\n").replace(/\\\\n/g,"\n").replace(/\\\\r/g,"\n").trim();const prefix=textArea.value?"\n":"";const labelStart=textArea.value.length+prefix.length+stamp.length;const start=labelStart+speakerLabel.length;internalTranscriptUpdate=true;textArea.value+=prefix+stamp+speakerLabel+recognizedText;transcriptSegments.push({t0:Number(event.t0)||0,t1:Number(event.t1)||0,start,end:start+recognizedText.length,labelStart,labelEnd:start,speaker:speakerId,speakerName});internalTranscriptUpdate=false;persistTranscript()}
