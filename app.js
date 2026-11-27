@@ -80,11 +80,14 @@ async function ensureAsr(){
   asrWorker.onerror=e=>{const detail=e.message||"unknown worker error";status("Workerエラー: "+detail);console.error("ASR_WORKER_ERROR",detail,e.filename||"",e.lineno||0)};
   const ready=new Promise((resolve,reject)=>{
    const timeout=setTimeout(()=>reject(new Error("WASM/モデル初期化がタイムアウトしました")),15*60*1000);
+   const cleanup=()=>{clearTimeout(timeout);asrWorker?.removeEventListener("message",listener);asrWorker?.removeEventListener("error",workerError)};
    const listener=({data})=>{
-    if(data.type==="ready"){clearTimeout(timeout);asrWorker.removeEventListener("message",listener);resolve()}
-    if(data.type==="error"){clearTimeout(timeout);asrWorker.removeEventListener("message",listener);reject(new Error(data.message))}
+    if(data.type==="ready"){cleanup();resolve()}
+    if(data.type==="error"){cleanup();reject(new Error(data.message))}
    };
+   const workerError=(event)=>{cleanup();reject(new Error("ASR Worker startup failed: "+(event.message||"worker error")))};
    asrWorker.addEventListener("message",listener);
+   asrWorker.addEventListener("error",workerError);
   });
   asrWorker.postMessage({
    type:"init",
@@ -96,7 +99,10 @@ async function ensureAsr(){
   });
   await ready;
  })();
- try{await asrStarting}finally{asrStarting=null}
+ try{await asrStarting}catch(error){
+  asrWorker?.terminate();asrWorker=null;asrReady=false;
+  throw error;
+ }finally{asrStarting=null}
 }
 async function startLivePcm(stream){
  if(!audioContext)audioContext=new AudioContext({latencyHint:"interactive"});
