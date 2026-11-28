@@ -239,7 +239,7 @@ recordBtn.addEventListener("click",async()=>{
   const [capturedStream]=await Promise.all([activeAudioSource.start(),audioContext.resume()]);
   mediaStream=capturedStream;
   if(!mediaStream?.getAudioTracks?.().length)throw new Error("音声トラックを取得できませんでした");
-  if(navigator.storage?.persist){try{const persisted=await navigator.storage.persist();console.info("Persistent storage granted:",persisted)}catch(error){console.warn("Persistent storage request failed",error)}}
+  if(navigator.storage?.persist){navigator.storage.persist().then(persisted=>console.info("Persistent storage granted:",persisted)).catch(error=>console.warn("Persistent storage request failed",error))}
   await ensureAsr();
   await startLivePcm(mediaStream);
   chunks=[];enrollmentChunks=[];enrollmentSamples=0;audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
