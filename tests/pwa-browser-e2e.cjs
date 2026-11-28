@@ -69,8 +69,9 @@ async function startAndRecognize(page, label) {
   // dismisses dialogs by default when no listener is registered, which makes
   // the recording button silently return to idle and causes a false timeout.
   page.on("dialog", async dialog => {
-    console.log("BROWSER_DIALOG", dialog.type, dialog.message());
-    if (dialog.type === "confirm") await dialog.accept();
+    const dialogType = dialog.type();
+    console.log("BROWSER_DIALOG", dialogType, dialog.message());
+    if (dialogType === "confirm") await dialog.accept();
     else await dialog.dismiss();
   });
   page.on("console", message => { if (message.type() === "error") console.error("CONSOLE_ERROR", message.text()); });
