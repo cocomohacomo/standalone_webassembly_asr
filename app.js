@@ -56,7 +56,7 @@ function normalizeTranscriptText(value){
 try{const storedTranscript=localStorage.getItem(TRANSCRIPT_KEY)||"";textArea.value=normalizeTranscriptText(storedTranscript);transcriptSegments=JSON.parse(localStorage.getItem("vnnTranscriptSegments")||"[]");if(textArea.value!==storedTranscript){transcriptSegments=[];localStorage.setItem("vnnTranscriptSegments","[]");localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}}catch{transcriptSegments=[]}transcriptLogicalLength=textArea.value.length;fitTranscriptArea();
 async function restoreSavedAudio(){if(!settings.saveAudio)return;try{const blob=await loadAudioLocally();if(!blob)return;audioBlob=blob;cleanUrl();audioUrl=URL.createObjectURL(blob);audioEl.src=audioUrl;audioEl.load();$("#playbackRail").style.display="flex";$(".transcript").classList.add("has-playback");$("#downloadAudioBtn").disabled=false;status("保存済みの録音を復元しました")}catch(error){console.warn("Saved audio restore failed",error)}}
 
-let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
+let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;\nconst MODEL_READY_KEY="vnnAsrModelReady",MODEL_READY_VALUE="13b4596";\nfunction hasConfirmedModelSetup(){try{return localStorage.getItem(MODEL_READY_KEY)===MODEL_READY_VALUE}catch{return false}}\nfunction markModelSetupReady(){try{localStorage.setItem(MODEL_READY_KEY,MODEL_READY_VALUE)}catch(error){console.warn("Model-ready marker persistence failed",error)}}
 let enrollmentChunks=[],enrollmentSamples=0,speakerProfiles=[];const ENROLLMENT_MAX_SAMPLES=16000*10;
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
@@ -129,7 +129,7 @@ function workerMessage({data}){
  if(data.type==="speaker-relabeled"){status("会議全体の話者ラベルを再判定しました");return}
  if(data.type==="speaker-merged"){status("話者を統合しました");return}
  if(data.type==="speaker-capabilities"&&(!data.diarization||!data.voiceprint)){status("話者識別機能を初期化できませんでした");return}
- if(data.type==="ready"){asrReady=true;asrWorker?.postMessage({type:"speaker-profiles"});status("日本語音声認識・話者識別の準備完了");return}
+ if(data.type==="ready"){asrReady=true;markModelSetupReady();asrWorker?.postMessage({type:"speaker-profiles"});status("日本語音声認識・話者識別の準備完了");return}
  if(data.type==="asr-event"){
   const event=data.event||{};
   if(event.type===9){const seg=transcriptSegments.find(x=>Math.abs(x.t0-Number(event.t0))<0.03&&Math.abs(x.t1-Number(event.t1))<0.03);if(seg){const label=settings.speakerDisplay?(event.speakerName?"["+event.speakerName+"] ":event.speaker?"["+event.speaker+"] ":""):"";const oldLength=seg.labelEnd-seg.labelStart;internalTranscriptUpdate=true;textArea.setRangeText(label,seg.labelStart,seg.labelEnd,"preserve");const delta=label.length-oldLength;seg.labelEnd=seg.labelStart+label.length;seg.start+=delta;seg.end+=delta;seg.speaker=event.speaker||"";seg.speakerName=event.speakerName||"";for(const item of transcriptSegments){if(item!==seg&&item.start>=seg.end-delta){item.start+=delta;item.end+=delta;item.labelStart+=delta;item.labelEnd+=delta}}internalTranscriptUpdate=false;persistTranscript()}return}
@@ -198,7 +198,7 @@ async function stopLivePcm(){
 recordBtn.addEventListener("click",async()=>{
  if(recorder?.state==="recording"){stopBtn.click();return}
  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
- recordBtn.disabled=true;recordBtn.textContent="…";if(!asrReady&&!confirm("初回は日本語ASR・VAD・話者識別モデルをダウンロードして端末に保存します。完了後はオフラインで利用できます。続行しますか？")){recordBtn.disabled=false;recordBtn.textContent="●";return}status("ASRと日本語モデルを準備しています…",true);
+ recordBtn.disabled=true;recordBtn.textContent="…";if(!asrReady&&!hasConfirmedModelSetup()&&!confirm("初回は日本語ASR・VAD・話者識別モデルをダウンロードして端末に保存します。完了後はオフラインで利用できます。続行しますか？")){recordBtn.disabled=false;recordBtn.textContent="●";return}status(hasConfirmedModelSetup()?"保存済みモデルを確認しています…":"ASRと日本語モデルを準備しています…",true);
  try{
   mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   audioContext=new AudioContext({latencyHint:"interactive"});
