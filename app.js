@@ -233,11 +233,12 @@ recordBtn.addEventListener("click",async()=>{
    if(recorder?.state==="recording")stopBtn.click();
    else status("音声入力が終了しました");
   };
-  // Start capture from the explicit user gesture before model initialization.
-  mediaStream=await activeAudioSource.start();
-  if(!mediaStream?.getAudioTracks?.().length)throw new Error("音声トラックを取得できませんでした");
+  // Invoke both browser capture and AudioContext resume synchronously from
+  // the user gesture before awaiting either permission/policy-gated promise.
   audioContext=new AudioContext({latencyHint:"interactive"});
-  await audioContext.resume();
+  const [capturedStream]=await Promise.all([activeAudioSource.start(),audioContext.resume()]);
+  mediaStream=capturedStream;
+  if(!mediaStream?.getAudioTracks?.().length)throw new Error("音声トラックを取得できませんでした");
   if(navigator.storage?.persist){try{const persisted=await navigator.storage.persist();console.info("Persistent storage granted:",persisted)}catch(error){console.warn("Persistent storage request failed",error)}}
   await ensureAsr();
   await startLivePcm(mediaStream);
