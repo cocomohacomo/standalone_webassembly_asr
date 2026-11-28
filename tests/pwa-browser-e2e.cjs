@@ -65,6 +65,14 @@ async function startAndRecognize(page, label) {
   const context = await browser.newContext({ permissions: ["microphone"] });
   const page = await context.newPage();
   page.on("pageerror", error => console.error("PAGE_ERROR", error.message));
+  // The app intentionally asks for first-run model-download consent. Playwright
+  // dismisses dialogs by default when no listener is registered, which makes
+  // the recording button silently return to idle and causes a false timeout.
+  page.on("dialog", async dialog => {
+    console.log("BROWSER_DIALOG", dialog.type, dialog.message());
+    if (dialog.type === "confirm") await dialog.accept();
+    else await dialog.dismiss();
+  });
   page.on("console", message => { if (message.type() === "error") console.error("CONSOLE_ERROR", message.text()); });
 
   try {
