@@ -4,30 +4,54 @@ const path = require("node:path");
 const root = process.env.PWA_TEST_URL || "http://127.0.0.1:4173/";
 const wav = path.resolve(__dirname, "../.cache/ja-model/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/test_wavs/1.wav");
 
-async function waitForTranscript(page, label) {
-  await page.waitForFunction(() => document.querySelector("#text").value.trim().length > 0,
-    undefined, { timeout: 240000 });
+async function waitForTranscript(page, label, previousText) {
+  await page.waitForFunction(previous => {
+    const current = document.querySelector("#text")?.value || "";
+    return current.trim().length > 0 && current.length > previous.length;
+  }, previousText, { timeout: 240000 });
   const transcript = await page.locator("#text").inputValue();
-  if (!/[ぁ-んァ-ヶ一-龯]/u.test(transcript)) throw new Error(label + ": no Japanese text in transcript: " + transcript);
-  console.log(label + "_TRANSCRIPT=" + transcript.replace(/\s+/g, " "));
+  if (!/[ぁ-んァ-ヶ一-龯]/u.test(transcript.slice(previousText.length))) {
+    throw new Error(label + ": no new Japanese text in transcript: " + transcript);
+  }
+  console.log(label + "_TRANSCRIPT=" + transcript.slice(previousText.length).replace(/\s+/g, " "));
 }
 
 async function startAndRecognize(page, label) {
+  const previousText = await page.locator("#text").inputValue();
   await page.locator("#recordBtn").click();
-  await page.waitForFunction(() => {
-    const status = document.querySelector("#statusText")?.textContent || "";
-    return status.includes("録音・日本語認識中") || status.includes("録音・認識を終了") ||
-      status.includes("エラー") || status.includes("Failed to fetch") || status.includes("network request failed") || status.includes("Model fetch failed") || status.includes("WASM fetch failed") || status.includes("タイムアウト");
-  }, undefined, { timeout: 240000 });
-  const startupStatus = await page.locator("#statusText").textContent();
-  if (startupStatus.includes("エラー") || startupStatus.includes("Failed to fetch") || startupStatus.includes("network request failed") || startupStatus.includes("Model fetch failed") || startupStatus.includes("WASM fetch failed") || startupStatus.includes("タイムアウト")) {
-    throw new Error(label + ": ASR startup failed: " + startupStatus);
+  try {
+    await page.waitForFunction(() => {
+      const record = document.querySelector("#recordBtn");
+      const stop = document.querySelector("#stopBtn");
+      const status = document.querySelector("#statusText")?.textContent || "";
+      return (!record?.disabled && !stop?.disabled) ||
+        status.includes("開始エラー") || status.includes("ASRエラー") ||
+        status.includes("Workerエラー") || status.includes("タイムアウト");
+    }, undefined, { timeout: 240000 });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => ({
+      status: document.querySelector("#statusText")?.textContent || "",
+      recordDisabled: document.querySelector("#recordBtn")?.disabled,
+      stopDisabled: document.querySelector("#stopBtn")?.disabled,
+      online: navigator.onLine,
+      controlled: !!navigator.serviceWorker?.controller,
+      modelReady: localStorage.getItem("vnnAsrModelReady"),
+      transcriptLength: document.querySelector("#text")?.value?.length || 0
+    }));
+    throw new Error(label + ": startup wait timed out; " + JSON.stringify(diagnostic) + "; " + error.message);
+  }
+  const state = await page.evaluate(() => ({
+    status: document.querySelector("#statusText")?.textContent || "",
+    recordDisabled: document.querySelector("#recordBtn")?.disabled,
+    stopDisabled: document.querySelector("#stopBtn")?.disabled
+  }));
+  if (state.stopDisabled) {
+    throw new Error(label + ": ASR startup failed: " + state.status + " state=" + JSON.stringify(state));
   }
   await page.waitForTimeout(7000);
   await page.locator("#stopBtn").click();
-  await waitForTranscript(page, label);
+  await waitForTranscript(page, label, previousText);
 }
-
 (async () => {
   const browser = await chromium.launch({
     headless: true,
