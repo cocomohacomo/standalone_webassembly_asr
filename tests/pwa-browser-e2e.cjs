@@ -81,7 +81,15 @@ async function startAndRecognize(page, label) {
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload({ waitUntil: "networkidle" });
     await startAndRecognize(page, "ONLINE");
-    await page.waitForTimeout(1500);
+
+    // Isolate the offline run from the online transcript. The application persists
+    // recognized text across reloads, so comparing against a partially streamed
+    // online result can mistake restored text for newly recognized offline output.
+    await page.locator("#clearBtn").click();
+    await page.waitForFunction(() =>
+      document.querySelector("#text")?.value === "" &&
+      localStorage.getItem("vnnTranscript") === ""
+    , undefined, { timeout: 10000 });
 
     await context.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded" });
