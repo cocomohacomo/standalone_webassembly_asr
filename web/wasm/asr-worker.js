@@ -11,42 +11,22 @@ function cstr(value){return runtime.stringToNewUTF8(String(value??""))}
 function jsonFrom(ptr){return ptr?runtime.UTF8ToString(ptr):"[]"}
 async function persistVoiceprints(){const path=cstr("/data/voiceprints.oed");const rc=runtime._wasm_asr_voiceprint_save(path);runtime._free(path);if(rc<0)throw new Error(runtime.UTF8ToString(runtime._wasm_asr_last_error()));await saveVoiceprintPack(runtime.FS.readFile("/data/voiceprints.oed"));}
 
-const MODEL_DB = "vnn-asr-model-cache";
-const MODEL_STORE = "models";
-const MODEL_CACHE_VERSION = "v1";
-function openModelDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(MODEL_DB, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(MODEL_STORE)) db.createObjectStore(MODEL_STORE);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("Model storage unavailable"));
-  });
+const MODEL_CACHE_NAME = "vnn-asr-model-cache-v2";
+const MODEL_CACHE_VERSION = "v2";
+function modelCacheRequest(key) {
+  return new Request(new URL("/__vnn_model_cache__/" + encodeURIComponent(key), self.location.origin));
 }
 async function readCachedModel(key) {
-  const db = await openModelDb();
-  try {
-    return await new Promise((resolve, reject) => {
-      const tx = db.transaction(MODEL_STORE, "readonly");
-      const request = tx.objectStore(MODEL_STORE).get(key);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-  } finally { db.close(); }
+  const cache = await caches.open(MODEL_CACHE_NAME);
+  const response = await cache.match(modelCacheRequest(key));
+  if (!response) return null;
+  return { bytes: await response.arrayBuffer(), sha256: response.headers.get("x-vnn-sha256") || "" };
 }
 async function writeCachedModel(key, record) {
-  const db = await openModelDb();
-  try {
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(MODEL_STORE, "readwrite");
-      tx.objectStore(MODEL_STORE).put(record, key);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error || new Error("Model cache write failed"));
-      tx.onabort = () => reject(tx.error || new Error("Model cache transaction aborted"));
-    });
-  } finally { db.close(); }
+  const cache = await caches.open(MODEL_CACHE_NAME);
+  await cache.put(modelCacheRequest(key), new Response(record.bytes, {
+    headers: { "content-type": "application/octet-stream", "x-vnn-sha256": record.sha256 }
+  }));
 }
 async function sha256Hex(bytes) {
   if (!self.crypto?.subtle) throw new Error("SHA-256 verification unavailable");

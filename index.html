@@ -28,6 +28,8 @@ header{position:fixed;top:0;left:0;right:0;z-index:15;height:calc(66px + env(saf
 #clearBtn{position:absolute;right:18px;bottom:calc(116px + env(safe-area-inset-bottom));border:0;background:transparent;color:#888;font-size:12px;padding:8px}
 .bottom-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:0;padding:0;background:transparent;border-radius:0;z-index:10}
 .bottom-bar button{border:0;background:transparent;color:#111;font:inherit;min-width:42px;min-height:46px;font-size:17px}
+.bottom-bar #inputSourceBtn{min-width:58px;height:40px;min-height:40px;padding:0 10px;border:1px solid var(--line);border-radius:20px;font-size:12px;font-weight:600;background:#fff;color:#333}
+.bottom-bar #inputSourceBtn:disabled{opacity:.45}
 .bottom-bar #recordBtn{background:#111;color:#fff;border-radius:50%;width:54px;height:54px;font-weight:600}
 button:disabled{opacity:.4}
 #settingsPanel{position:fixed;inset:0;z-index:20;background:#0004;display:none;align-items:flex-end;justify-content:center}
@@ -58,7 +60,7 @@ button:disabled{opacity:.4}
 <div class="card" id="history-card"><div id="history"></div></div>
 <audio id="audio" controls preload="metadata" class="hide" style="width:100%"></audio><button id="downloadAudioBtn" disabled>録音を保存</button><button id="clearBtn">クリア</button><button class="btn install" id="installBtn" hidden>アプリをインストール</button><span id="connection">準備中</span>
 </main>
-<div class="bottom-bar" aria-label="録音操作"><button id="recordBtn" type="button" aria-label="録音開始">●</button></div>
+<div class="bottom-bar" aria-label="録音操作"><button id="inputSourceBtn" type="button" aria-label="音声入力方式を切替" title="入力: マイク">マイク</button><button id="recordBtn" type="button" aria-label="録音開始">●</button></div>
 <div id="settingsPanel" role="dialog" aria-modal="true" aria-label="設定">
 <div class="settings-sheet">
 <div class="settings-head"><span>設定</span><button id="settingsClose" type="button">閉じる</button></div>
@@ -68,4 +70,4 @@ button:disabled{opacity:.4}
 <div class="settings-group"><h3>辞書登録</h3><div class="inline-add"><input id="dictionaryInput" placeholder="単語・読みを登録"><button id="dictionaryAdd">追加</button></div><div id="dictionaryList"></div></div>
 <div class="settings-group"><h3>話者登録</h3><p style="font-size:12px;color:#777;margin:0 0 8px">録音中に対象者が単独で話した直近10秒を使って声紋を登録します。話者識別は音声特徴量モデルを使用します。</p><div class="inline-add"><input id="speakerInput" placeholder="話者名"><button id="speakerAdd">音声登録</button></div><div class="inline-add"><select id="speakerAssignSelect" class="setting-select"><option value="">割当先を選択</option></select><button id="speakerAssignBtn" type="button">選択区間に割当</button></div><div class="inline-add"><button id="speakerSave" type="button">声紋を暗号化保存</button><button id="speakerRelabel" type="button">話者を再判定</button></div><div id="speakerList"></div></div>
 </div></div>
-<script src="./app.js"></script></body></html>
+<script src="./web/audio/audio-source.js"></script><script src="./app.js"></script></body></html>

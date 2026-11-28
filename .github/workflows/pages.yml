@@ -48,10 +48,12 @@ jobs:
           grep -q 'model-cache-hit' web/wasm/asr-worker.js
           grep -q 'model-cached' web/wasm/asr-worker.js
           grep -q 'sherpa_embed_asr_wasm.wasm' sw.js
+          test -s web/audio/audio-source.js
           test -s web/wasm/pcm-worklet.js
           node --check app.js
           node --check sw.js
           node --check web/wasm/asr-worker.js
+          node --check web/audio/audio-source.js
           node --check web/wasm/pcm-worklet.js
           python3 - <<'PY'
           import json
@@ -113,6 +115,8 @@ jobs:
           install -m 0644 index.html app.js sw.js manifest.webmanifest VERSION icon.svg THIRD_PARTY_NOTICES.md _site/
           mkdir -p _site/licenses
           cp -a licenses/. _site/licenses/
+          install -d _site/web/audio
+          install -m 0644 web/audio/audio-source.js _site/web/audio/
           install -m 0644 web/wasm/asr-worker.js web/wasm/pcm-worklet.js _site/web/wasm/
           install -m 0644 web/wasm/dist/sherpa_embed_asr_wasm.js web/wasm/dist/sherpa_embed_asr_wasm.wasm _site/web/wasm/dist/
           if [[ -f models/SHA256SUMS ]]; then install -d _site/models; cp -a models/. _site/models/; fi
@@ -142,6 +146,7 @@ jobs:
               "licenses/whisper-diarization-suite.NOTICE.txt",
               "licenses/punct_ja_cv.NOTICE.txt",
               "web/wasm/asr-worker.js",
+              "web/audio/audio-source.js",
               "web/wasm/pcm-worklet.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.js",
               "web/wasm/dist/sherpa_embed_asr_wasm.wasm",
@@ -163,10 +168,12 @@ jobs:
           app = (root / "app.js").read_text(encoding="utf-8")
           shell = (root / "sw.js").read_text(encoding="utf-8")
           assert '"./web/wasm/asr-worker.js"' in shell
+          assert '"./web/audio/audio-source.js"' in shell
           assert '"./web/wasm/pcm-worklet.js"' in shell
           assert '"./web/wasm/dist/sherpa_embed_asr_wasm.js"' in shell
           assert '"./web/wasm/dist/sherpa_embed_asr_wasm.wasm"' in shell
           assert "./web/wasm/asr-worker.js" in app
+          assert "./web/audio/audio-source.js" in app
           assert "./web/wasm/pcm-worklet.js" in app
           assert "./web/wasm/dist/sherpa_embed_asr_wasm.js" in app
 
