@@ -320,7 +320,7 @@ function updatePlaybackCursor(){
  $("#playProgress").style.height=percent+"%";
  rail.setAttribute("aria-valuenow",String(Math.round(percent)));
  rail.setAttribute("aria-valuetext",fmt(audioEl.currentTime*1000)+" / "+fmt(duration*1000));
- const buffered=[];if(duration>0){for(let i=0;i<audioEl.buffered.length;i++){const start=Math.max(0,audioEl.buffered.start(i)/duration*100),end=Math.min(100,audioEl.buffered.end(i)/duration*100);if(end>start)buffered.push(start.toFixed(2)+"% "+end.toFixed(2)+"%")}}rail.style.setProperty("--buffered-ranges",buffered.length?"#c8c8c8 "+buffered.join(", #c8c8c8 "):"transparent");
+ const buffered=[];if(duration>0){for(let i=0;i<audioEl.buffered.length;i++){const start=Math.max(0,audioEl.buffered.start(i)/duration*100),end=Math.min(100,audioEl.buffered.end(i)/duration*100);if(end>start)buffered.push(start.toFixed(2)+"% "+end.toFixed(2)+"%")}}const stops=[];let edge=0;for(let i=0;i<audioEl.buffered.length&&duration>0;i++){const start=Math.max(0,audioEl.buffered.start(i)/duration*100),end=Math.min(100,audioEl.buffered.end(i)/duration*100);if(start>edge)stops.push("transparent "+edge.toFixed(2)+"%","transparent "+start.toFixed(2)+"%");if(end>start)stops.push("#c8c8c8 "+start.toFixed(2)+"%","#c8c8c8 "+end.toFixed(2)+"%");edge=end}if(edge<100)stops.push("transparent "+edge.toFixed(2)+"%","transparent 100%");rail.style.setProperty("--buffered-gradient",stops.length?"linear-gradient(to bottom,"+stops.join(",")+")":"transparent");
 }
 let playbackFrame=0;
 function animatePlaybackCursor(){updatePlaybackCursor();if(!audioEl.paused&&!audioEl.ended)playbackFrame=requestAnimationFrame(animatePlaybackCursor);else playbackFrame=0}
@@ -378,7 +378,6 @@ playbackRail.addEventListener("keydown",event=>{
  event.preventDefault();audioEl.currentTime=Math.max(0,Math.min(duration,next));updatePlaybackCursor();syncTranscriptToPlayback();
 });
 audioEl.addEventListener("loadedmetadata",()=>{audioEl.currentTime=0;updatePlaybackCursor()});
-audioEl.addEventListener("durationchange",updatePlaybackCursor);
 audioEl.addEventListener("seeking",updatePlaybackCursor);
 audioEl.addEventListener("seeked",updatePlaybackCursor);
 audioEl.addEventListener("timeupdate",()=>{updatePlaybackCursor();syncTranscriptToPlayback()});
@@ -388,7 +387,7 @@ audioEl.addEventListener("canplay",updatePlaybackCursor);
 audioEl.addEventListener("progress",updatePlaybackCursor);
 audioEl.addEventListener("loadeddata",updatePlaybackCursor);
 audioEl.addEventListener("durationchange",updatePlaybackCursor);
-audioEl.addEventListener("error",()=>{if(audioBlob)status("録音音声を読み込めませんでした")});
+audioEl.addEventListener("error",()=>{if(audioBlob)status("音声ファイルを読み込めませんでした")});
 audioEl.addEventListener("ended",()=>{$("#playToggle").textContent="▶";if(playbackFrame)cancelAnimationFrame(playbackFrame);playbackFrame=0;updatePlaybackCursor();textArea.setSelectionRange(0,0)});
 textArea.addEventListener("input",()=>{if(!internalTranscriptUpdate){if(transcriptTypingTimer)clearTimeout(transcriptTypingTimer);transcriptTypingTimer=0;transcriptQueue.length=0;transcriptLogicalLength=textArea.value.length;transcriptSegments=[];localStorage.removeItem("vnnTranscriptSegments")}fitTranscriptArea();persistTranscript()});
 $("#dictionaryAdd").addEventListener("click",()=>{const value=$("#dictionaryInput").value.trim();if(!value)return;if(!settings.dictionary.includes(value))settings.dictionary.push(value);$("#dictionaryInput").value="";persistSettings();renderSettingsListsOnce()});
