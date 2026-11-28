@@ -57,7 +57,10 @@ function normalizeTranscriptText(value){
 try{const storedTranscript=localStorage.getItem(TRANSCRIPT_KEY)||"";textArea.value=normalizeTranscriptText(storedTranscript);transcriptSegments=JSON.parse(localStorage.getItem("vnnTranscriptSegments")||"[]");if(textArea.value!==storedTranscript){transcriptSegments=[];localStorage.setItem("vnnTranscriptSegments","[]");localStorage.setItem(TRANSCRIPT_KEY,textArea.value)}}catch{transcriptSegments=[]}transcriptLogicalLength=textArea.value.length;fitTranscriptArea();
 async function restoreSavedAudio(){if(!settings.saveAudio)return;try{const blob=await loadAudioLocally();if(!blob)return;audioBlob=blob;cleanUrl();audioUrl=URL.createObjectURL(blob);audioEl.src=audioUrl;audioEl.load();$("#playbackRail").style.display="flex";$(".transcript").classList.add("has-playback");$("#downloadAudioBtn").disabled=false;status("保存済みの録音を復元しました")}catch(error){console.warn("Saved audio restore failed",error)}}
 
-let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;\nconst MODEL_READY_KEY="vnnAsrModelReady",MODEL_READY_VALUE="13b4596";\nfunction hasConfirmedModelSetup(){try{return localStorage.getItem(MODEL_READY_KEY)===MODEL_READY_VALUE}catch{return false}}\nfunction markModelSetupReady(){try{localStorage.setItem(MODEL_READY_KEY,MODEL_READY_VALUE)}catch(error){console.warn("Model-ready marker persistence failed",error)}}
+let asrWorker=null,audioContext=null,mediaStream=null,sourceNode=null,workletNode=null,asrReady=false,asrStarting=null;
+const MODEL_READY_KEY="vnnAsrModelReady",MODEL_READY_VALUE="13b4596";
+function hasConfirmedModelSetup(){try{return localStorage.getItem(MODEL_READY_KEY)===MODEL_READY_VALUE}catch{return false}}
+function markModelSetupReady(){try{localStorage.setItem(MODEL_READY_KEY,MODEL_READY_VALUE)}catch(error){console.warn("Model-ready marker persistence failed",error)}}
 let enrollmentChunks=[],enrollmentSamples=0,speakerProfiles=[];const ENROLLMENT_MAX_SAMPLES=16000*10;
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
