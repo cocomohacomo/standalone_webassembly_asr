@@ -49,8 +49,11 @@ async function startAndRecognize(page, label) {
     throw new Error(label + ": ASR startup failed: " + state.status + " state=" + JSON.stringify(state));
   }
   await page.waitForTimeout(7000);
-  // The stop control is visually hidden in the compact test viewport; trigger its real DOM handler.\n  await page.locator("#stopBtn").evaluate(button => button.click());
+  // The stop control is visually hidden in the compact test viewport; trigger its real DOM handler.
+  await page.locator("#stopBtn").evaluate(button => button.click());
   await waitForTranscript(page, label, previousText);
+  // Allow the app transcript queue and debounced local persistence to finish.
+  await page.waitForTimeout(1800);
 }
 (async () => {
   const browser = await chromium.launch({
