@@ -37,6 +37,7 @@ function openSettings(){$("#saveAudioSetting").checked=!!settings.saveAudio;$("#
 function closeSettings(){$("#settingsPanel").classList.remove("open")}
 
 let recorder=null,chunks=[],audioBlob=null,audioUrl=null,startedAt=0,timerId=null,deferredInstallPrompt=null;
+let activeAudioSource=null,audioInputMode="mic";
 let transcriptSegments=[],internalTranscriptUpdate=false,settingsDirty=false;let transcriptLogicalLength=0;const transcriptQueue=[];let transcriptTypingTimer=0;
 function normalizeTranscriptText(value){
  let text=String(value??"");
@@ -195,25 +196,80 @@ async function stopLivePcm(){
  workletNode=null;sourceNode=null;audioContext=null;
  if(asrReady)asrWorker.postMessage({type:"flush"});
 }
+function updateAudioInputButton(){
+ const button=$("#inputSourceBtn");
+ const system=audioInputMode==="system";
+ button.textContent=system?"タブ音声":"マイク";
+ button.title=system?"入力: ブラウザタブ音声":"入力: マイク";
+ button.setAttribute("aria-label",button.title+"。タップして切替");
+}
+$("#inputSourceBtn").addEventListener("click",()=>{
+ if(recorder?.state==="recording"||recordBtn.disabled)return;
+ const next=audioInputMode==="mic"?"system":"mic";
+ if(next==="system"&&!window.VnnAudioSources?.isSupported("system")){
+  status("このブラウザではタブ音声共有に対応していません");
+  return;
+ }
+ audioInputMode=next;
+ updateAudioInputButton();
+ status(next==="system"?"入力方式: ブラウザタブ音声":"入力方式: マイク");
+});
+updateAudioInputButton();
+
 recordBtn.addEventListener("click",async()=>{
  if(recorder?.state==="recording"){stopBtn.click();return}
- if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status("このブラウザでは録音に対応していません");return}
- recordBtn.disabled=true;recordBtn.textContent="…";if(!asrReady&&!hasConfirmedModelSetup()&&!confirm("初回は日本語ASR・VAD・話者識別モデルをダウンロードして端末に保存します。完了後はオフラインで利用できます。続行しますか？")){recordBtn.disabled=false;recordBtn.textContent="●";return}status(hasConfirmedModelSetup()?"保存済みモデルを確認しています…":"ASRと日本語モデルを準備しています…",true);
+ if(!window.MediaRecorder||!window.VnnAudioSources){status("このブラウザでは音声入力に対応していません");return}
+ recordBtn.disabled=true;recordBtn.textContent="…";
+ if(!asrReady&&!hasConfirmedModelSetup()&&!confirm("初回は日本語ASR・VAD・話者識別モデルをダウンロードして端末に保存します。完了後はオフラインで利用できます。続行しますか？")){
+  recordBtn.disabled=false;recordBtn.textContent="●";return
+ }
+ status(hasConfirmedModelSetup()?"保存済みモデルを確認しています…":"ASRと日本語モデルを準備しています…",true);
  try{
-  mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  activeAudioSource=window.VnnAudioSources.create(audioInputMode);
+  activeAudioSource.onEnded=()=>{
+   if(recorder?.state==="recording")stopBtn.click();
+   else status("音声入力が終了しました");
+  };
+  // Start capture from the explicit user gesture before model initialization.
+  mediaStream=await activeAudioSource.start();
+  if(!mediaStream?.getAudioTracks?.().length)throw new Error("音声トラックを取得できませんでした");
   audioContext=new AudioContext({latencyHint:"interactive"});
   await audioContext.resume();
-  if(navigator.storage?.persist){try{const persisted=await navigator.storage.persist();console.info("Persistent storage granted:",persisted)}catch(error){console.warn("Persistent storage request failed:",error)}}
+  if(navigator.storage?.persist){try{const persisted=await navigator.storage.persist();console.info("Persistent storage granted:",persisted)}catch(error){console.warn("Persistent storage request failed",error)}}
   await ensureAsr();
   await startLivePcm(mediaStream);
   chunks=[];enrollmentChunks=[];enrollmentSamples=0;audioBlob=null;cleanUrl();audioEl.classList.add("hide");audioEl.removeAttribute("src");
-  recorder=new MediaRecorder(mediaStream);recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
-  recorder.onstop=async()=>{audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;if(audioBlob){try{await saveAudioLocally(audioBlob)}catch(error){console.warn("Audio persistence failed",error);status("録音音声を端末に保存できませんでした")}audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.currentTime=0;audioEl.load();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex";$(".transcript").classList.add("has-playback")}else{await clearAudioLocally();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none";$(".transcript").classList.remove("has-playback")}mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false};
-  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,1000);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;status("録音・日本語認識中…",true);
- }catch(err){status(err.name==="NotAllowedError"?"マイクの使用が許可されていません":"ASR初期化エラー: "+(err.message||"認識を開始できません"));console.error(err);recordBtn.textContent="開始";recordBtn.disabled=false;mediaStream?.getTracks().forEach(t=>t.stop());mediaStream=null;try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null}
+  recorder=new MediaRecorder(mediaStream);
+  recorder.ondataavailable=e=>{if(settings.saveAudio&&e.data.size)chunks.push(e.data)};
+  recorder.onstop=async()=>{
+   audioBlob=settings.saveAudio&&chunks.length?new Blob(chunks,{type:recorder.mimeType||"audio/webm"}):null;
+   if(audioBlob){
+    try{await saveAudioLocally(audioBlob)}catch(error){console.warn("Audio persistence failed",error);status("録音音声を端末に保存できませんでした")}
+    audioUrl=URL.createObjectURL(audioBlob);audioEl.src=audioUrl;audioEl.currentTime=0;audioEl.load();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=false;$("#playbackRail").style.display="flex";$(".transcript").classList.add("has-playback");
+   }else{
+    await clearAudioLocally();audioEl.classList.add("hide");$("#downloadAudioBtn").disabled=true;$("#playbackRail").style.display="none";$(".transcript").classList.remove("has-playback");
+   }
+   try{await activeAudioSource?.stop()}catch(error){console.warn("Audio source cleanup failed",error)}
+   activeAudioSource=null;mediaStream=null;
+   status("録音・認識を終了しました");recordBtn.textContent="●";recordBtn.disabled=false;stopBtn.disabled=true;
+  };
+  recorder.start(500);startedAt=Date.now();setTimer();timerId=setInterval(setTimer,1000);recordBtn.textContent="■";recordBtn.disabled=false;stopBtn.disabled=false;
+  status(audioInputMode==="system"?"タブ音声・日本語認識中…":"録音・日本語認識中…",true);
+ }catch(err){
+  const message=err.name==="NotAllowedError"?(audioInputMode==="system"?"画面・音声共有が許可されていません":"マイクの使用が許可されていません"):err.message||"認識を開始できません";
+  status("開始エラー: "+message);console.error(err);
+  try{await activeAudioSource?.stop()}catch(cleanupError){console.warn(cleanupError)}
+  activeAudioSource=null;mediaStream=null;recordBtn.textContent="●";recordBtn.disabled=false;stopBtn.disabled=true;
+  try{if(audioContext&&audioContext.state!=="closed")await audioContext.close()}catch{}audioContext=null;
+ }
 });
 stopBtn.addEventListener("click",async()=>{
- if(recorder?.state==="recording"){stopBtn.disabled=true;await stopLivePcm();recorder.stop();clearInterval(timerId);recordBtn.textContent="●";recordBtn.disabled=false}
+ if(recorder?.state==="recording"){
+  stopBtn.disabled=true;
+  await stopLivePcm();
+  recorder.stop();clearInterval(timerId);
+  recordBtn.textContent="●";recordBtn.disabled=false;
+ }
 });
 $("#downloadAudioBtn").addEventListener("click",()=>{if(!audioBlob)return;const a=document.createElement("a");a.href=audioUrl;a.download="voice-memo-"+new Date().toISOString().replace(/[:.]/g,"-")+".webm";a.click()});
 
