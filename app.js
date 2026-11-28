@@ -319,11 +319,18 @@ function updatePlaybackCursor(){
 }
 let playbackFrame=0;
 function animatePlaybackCursor(){updatePlaybackCursor();if(!audioEl.paused&&!audioEl.ended)playbackFrame=requestAnimationFrame(animatePlaybackCursor);else playbackFrame=0}
+let playbackFocusedSegmentKey="";
 function syncTranscriptToPlayback(){
- if(document.activeElement===textArea)return;
  const time=audioEl.currentTime,segment=transcriptSegments.find(item=>time>=item.t0&&time<=item.t1);
  if(!segment)return;
- try{textArea.setSelectionRange(segment.start,segment.end)}catch{}
+ const key=segment.t0+":"+segment.t1+":"+segment.start+":"+segment.end;
+ if(key===playbackFocusedSegmentKey)return;
+ playbackFocusedSegmentKey=key;
+ try{
+  textArea.focus({preventScroll:true});
+  textArea.setSelectionRange(segment.start,segment.end);
+  textArea.scrollIntoView({block:"nearest",behavior:"smooth"});
+ }catch(error){console.warn("Transcript playback focus failed",error)}
 }
 async function togglePlayback(){
  if(!audioBlob){status("再生できる録音音声がありません");return}
