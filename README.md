@@ -71,3 +71,27 @@ Model artifacts have separate terms documented in
 The Pages artifact publishes these notices under `/licenses/` as well as the
 model notice at `/THIRD_PARTY_NOTICES.md`. The application repository's own
 `LICENSE` does not replace any third-party license.
+
+
+## Browser-tab audio transcription
+
+The recorder supports microphone and browser-tab audio through a source-adapter
+boundary. Choose **タブ音声** beside the record button, start capture, then
+select the browser tab playing the source audio. In Chromium desktop browsers,
+enable the tab-audio sharing option in the browser share picker. The app records
+only selected audio tracks; the required display video track is never connected
+to the ASR pipeline or MediaRecorder.
+
+The browser source feeds the same mono 16 kHz PCM AudioWorklet and WASM Worker
+protocol as microphone input. Model loading, recognition, transcript handling,
+and local storage remain shared. The adapter contract is independent of the
+browser capture API so a future Android native AudioPlaybackCapture adapter
+can feed the same PCM pipeline.
+
+Limitations: browser-tab capture depends on browser/OS support and explicit
+user permission. The app cannot force a YouTube player or OS mute state. Mute
+the device speakers/output rather than muting the source tab itself; muting
+the source tab may also mute captured audio. Android Chrome/PWA support is not
+assumed and must be verified on-device. Capturing other Android apps requires
+a future native implementation and remains subject to Android capture policy
+and the source app's capture-allowance.
