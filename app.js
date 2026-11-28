@@ -65,7 +65,7 @@ let enrollmentChunks=[],enrollmentSamples=0,speakerProfiles=[];const ENROLLMENT_
 const MODEL_REV="13b4596";
 const MODEL_BASE="https://huggingface.co/DeL-TaiseiOzaki/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01/resolve/"+MODEL_REV+"/";
 const MODEL_FILES=[
- // Prefer same-origin bundled assets. After first verified download, IndexedDB is the authoritative offline source.
+ // Prefer same-origin bundled assets. After first verified download, the Worker stores model bytes in Cache Storage for offline reuse.
  {url:"./models/ja/tokens.txt",fallbackUrl:MODEL_BASE+"tokens.txt",path:"ja/tokens.txt"},
  {url:"./models/silero_vad.onnx",fallbackUrl:"https://huggingface.co/daxpatel235/silero-vad/resolve/main/silero_vad.onnx",path:"silero_vad.onnx",sha256:"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"},
  {url:"./models/ja/encoder-epoch-99-avg-1.int8.onnx",fallbackUrl:MODEL_BASE+"encoder-epoch-99-avg-1.int8.onnx",path:"ja/encoder-epoch-99-avg-1.int8.onnx"},
